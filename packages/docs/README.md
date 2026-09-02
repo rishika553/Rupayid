@@ -37,14 +37,13 @@ Production-grade lending platform built with a modern, type-safe monorepo archit
 
 ```
 rupayaid/
-├── apps/
-│   ├── web/                  # Next.js frontend
-│   └── api/                  # NestJS backend
+├── backend/                # NestJS backend API
+├── frontend/               # Next.js frontend
 ├── packages/
-│   ├── config/               # Shared configs (TS, ESLint, Prettier)
-│   ├── ui/                   # Shared UI components (shadcn/ui)
-│   ├── types/                # Shared TypeScript types
-│   └── docs/                 # Documentation
+│   ├── config/             # Shared configs (TS, ESLint, Prettier)
+│   ├── ui/                 # Shared UI components (shadcn/ui)
+│   ├── types/              # Shared TypeScript types
+│   └── docs/               # Documentation
 └── ...
 ```
 
@@ -63,8 +62,8 @@ rupayaid/
 pnpm install
 
 # Copy environment variables
-copy apps/web/.env.example apps/web/.env.local
-copy apps/api/.env.example apps/api/.env.local
+copy frontend/.env.example frontend/.env.local
+copy backend/.env.example backend/.env.local
 
 # Set up database (fill in DATABASE_URL first)
 pnpm db:generate
@@ -114,12 +113,12 @@ Each application has its own `.env.example` file documenting the required variab
 ## Deployment
 
 ### Frontend (Vercel)
-- Import the `apps/web` directory
+- Import the `frontend` directory
 - Set environment variables matching `.env.example`
 - Framework preset: Next.js
 
 ### Backend (Railway/Fly.io)
-- Deploy the `apps/api` directory
+- Deploy the `backend` directory
 - Configure `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`
 - Prisma migrations run via release command
 

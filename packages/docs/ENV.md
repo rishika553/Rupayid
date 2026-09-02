@@ -1,6 +1,6 @@
 # RupayAid Environment Variables
 
-## Frontend (`apps/web/.env.local`)
+## Frontend (`frontend/.env.local`)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -8,7 +8,7 @@
 | `NEXT_PUBLIC_APP_URL` | No | Public URL of the web app |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry client DSN |
 
-## Backend (`apps/api/.env.local`)
+## Backend (`backend/.env.local`)
 
 | Variable | Required | Description |
 |----------|----------|-------------|

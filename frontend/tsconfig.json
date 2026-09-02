@@ -1,0 +1,32 @@
+{
+  "extends": "../packages/config/tsconfig.frontend.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@rupayaid/ui": [
+        "../packages/ui"
+      ],
+      "@rupayaid/types": [
+        "../packages/types"
+      ]
+    },
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

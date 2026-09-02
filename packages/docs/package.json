@@ -2,15 +2,5 @@
   "name": "@rupayaid/docs",
   "version": "0.1.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
-  "files": [
-    "*.ts"
-  ],
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "typescript": "^5.3.3"
-  }
+  "description": "RupayAid documentation"
 }

@@ -10,8 +10,8 @@
 
 ## Development workflow
 
-- `apps/web` runs Next.js on port 3000
-- `apps/api` runs NestJS on port 3001
+- `frontend` runs Next.js on port 3000
+- `backend` runs NestJS on port 3001
 - API docs available at `http://localhost:3001/api/docs`
 
 ## Code conventions
@@ -24,13 +24,13 @@
 
 ## Adding a new API endpoint
 
-1. Create the NestJS module in `apps/api/src/modules/<name>/`
+1. Create the NestJS module in `backend/src/modules/<name>/`
 2. Define DTOs with class-validator decorators
 3. Register the module in `app.module.ts`
 4. Add shared types in `packages/types`
 
 ## Adding a new UI component
 
-1. Use `pnpm dlx shadcn-ui@latest add <component>` in `apps/web`
+1. Use `pnpm dlx shadcn-ui@latest add <component>` in `frontend`
 2. Move the component to `packages/ui/components/` if shared
 3. Export from `packages/ui/index.tsx`
