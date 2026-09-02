@@ -1,0 +1,1289 @@
+// RupayAid Database Schema
+// -------------------------------------------------
+// Conventions:
+//  * UUID primary keys everywhere.
+//  * All money uses Decimal (never Float).
+//  * Financial records (Ledger, LedgerEntry, PaymentTransaction) are
+//    append-only and protected by DB triggers (see migrations).
+//  * No raw OTP values, passwords, MFA secrets, or provider API keys
+//    are ever stored in plaintext. Only hashes are persisted.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  BORROWER // self-served customer
+  LENDER // institutional lend-side user
+  ADMIN // internal admin / ops
+  SUPPORT // customer support agent
+  UNDERWRITER // credit / KYC reviewer
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+  DELETED
+  LOCKED
+  DORMANT
+}
+
+enum KycApplicationStatus {
+  NOT_SUBMITTED
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  MORE_INFO_REQUIRED
+  APPROVED
+  REJECTED
+}
+
+enum KycDocumentType {
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+  PAN_CARD
+  AADHAAR_CARD
+  UTILITY_BILL
+  BANK_STATEMENT
+  INCOME_PROOF
+  SELFIE
+  OTHERS
+}
+
+enum KycDocumentStatus {
+  UPLOADED
+  PROCESSED
+  VERIFIED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum KycVerificationDecision {
+  APPROVED
+  REJECTED
+  REQUESTED_MORE_INFO
+  ESCALATED
+  AUTO_ACCEPTED
+  AUTO_REJECTED
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  CONVERTED // referee completed first loan or landed deposit
+  EXPIRED
+  CANCELLED
+  DECLINED
+}
+
+enum RuleType {
+  INCOME
+  AGE
+  CREDIT_SCORE
+  EMPLOYMENT
+  CITY_POSTCODE
+  BANKRUPTCY
+  MAX_DEBT_RATIO
+  MIN_BALANCE
+  CUSTOM
+}
+
+enum Operator {
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  EQUALS
+  NOT_EQUALS
+  IN
+  NOT_IN
+  BETWEEN
+  CONTAINS
+  EXISTS
+  NOT_EXISTS
+  ANY_OF // for OR of values
+}
+
+enum RuleEffect {
+  ALLOW
+  BLOCK
+  SOFT_BLOCK // manual review required
+}
+
+enum EligibilityRuleStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+  PENDING_DEPRECATION // scheduled for disable
+  FAILED_VALIDATION
+}
+
+enum EligibilityRuleVersionStatus {
+  DRAFT
+  VALIDATED
+  ACTIVE
+  DEPRECATED
+  REJECTED
+}
+
+enum EligibilityEvaluationStatus {
+  ELIGIBLE
+  INELIGIBLE
+  PENDING // awaiting more data
+  ERRORED
+  MANUAL_REVIEW_NEEDED
+}
+
+enum LoanStatus {
+  DRAFT
+  PENDING_PRE_CHECK
+  PRE_APPROVED
+  RECOMMENDED
+  SUBMITTED
+  UNDERWRITING
+  ELIGIBILITY_IN_PROGRESS
+  APPROVED
+  REJECTED
+  OFFER_ISSUED
+  ACCEPTED
+  AGREEMENT_SIGNED
+  DISBURSED
+  ACTIVE
+  PARTIALLY_PAID
+  CLOSED
+  DEFAULTED
+  WRITTEN_OFF
+  CANCELLED
+  EXPIRED // offer expired
+  PAUSED
+}
+
+enum LoanApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  RE_SENT
+  EXPIRED
+  CANCELLED
+}
+
+enum LoanApprovalDecision {
+  APPROVED
+  REJECTED
+  CONDITIONALLY_APPROVED
+  ESCALATED
+}
+
+enum DisbursementStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REVERSED
+  REFUNDED
+  SCHEDULED
+  ON_HOLD
+  RECALLED
+}
+
+enum DisbursementMethod {
+  NEFT
+  IMPS
+  RTGS
+  UPI
+  BANKTRANSFER
+  CHEQUE
+  CASH_SLIP
+  WALLET
+  OTHER
+}
+
+enum RepaymentScheduleStatus {
+  SCHEDULED
+  PAID
+  PARTIALLY_PAID
+  PAST_DUE
+  DEFAULTED
+  WAIVED
+  CANCELLED
+  RE_SCHEDULED
+  PREPAID
+  WRITTEN_OFF
+}
+
+enum RepaymentStatus {
+  SCHEDULED
+  PARTIAL_PAYMENT
+  PAID
+  PAST_DUE
+  DEFAULTED
+  WAIVED
+  WRITTEN_OFF
+  OVERPAID
+  REVERSED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  HOLD
+  REVERSED
+  REFUNDED
+  CANCELLED
+  AWAITING_CONFIRMATION
+  DISPUTED
+}
+
+enum PaymentType {
+  LOAN_DISBURSEMENT
+  EMI_REPAYMENT
+  PARTIAL_REPAYMENT
+  PREPAYMENT
+  PENALTY
+  FEES
+  REFUND
+  REVERSAL
+  CHARGEBACK
+}
+
+enum PaymentTransactionType {
+  PRINCIPAL
+  INTEREST
+  PENALTY
+  PROCESSING_FEE
+  INSURANCE
+  GST_TAX
+  OTHER_CHARGES
+  ADJUSTMENT
+  REVERSAL
+  REFUND
+}
+
+enum PaymentDirection {
+  DEBIT // money out of platform (disbursement, refund)
+  CREDIT // money into platform (repayment)
+}
+
+enum PaymentMethod {
+  UPI
+  NEFT
+  IMPS
+  RTGS
+  CARD
+  NET_BANKING
+  WALLET
+  CASH
+  CHEQUE
+  AUTODEBIT
+}
+
+enum LedgerType {
+  CUSTOMER
+  INTERNAL
+  PLATFORM
+  SYSTEM_ACCOUNT
+}
+
+enum LedgerKind {
+  PENDING
+  REALISED // confirmed, immutable
+  HOLD
+  UNRECONCILED
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerCategory {
+  RECEIVABLE
+  PAYABLE
+  ESCROW_PENDING
+  ESCROW_REALISED_BENEFICIERY
+  FEE_COLLECTION_INTERNAL
+  FEE_COLLECTION_CUSTOMER
+  SETTLEMENT
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  REFUND
+  PAYOUT_COLLECTION
+  BUFFER
+  ADJUSTMENT
+  INTEREST_ACCRUAL
+  PENALTY_ACCRUAL
+  OTHER
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  PUSH
+  INAPP
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  QUEUED
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  RETRY
+  CANCELLED
+  EXPIRED
+}
+
+enum NotificationChannel {
+  // meta channel for preference aggregation
+  EMAIL
+  SMS
+  PUSH
+  ADMIN_NOTIFY
+}
+
+enum NotificationPreferenceLevel {
+  CHOOSE // allow user choice
+  FORCE_ON // always deliver
+  FORCE_OFF // never deliver
+}
+
+enum TokenType {
+  REFRESH
+  ACCESS
+  MFA
+  OTP
+  ONE_TIME // link magic
+  API
+  SSO
+  WEBHOOK
+}
+
+enum OtpPurpose {
+  LOGIN
+  TWO_FACTOR_AUTH
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  TRANSACTION_SECURITY
+  KYC
+  OTHER_ADMIN
+}
+
+enum OtpVerificationStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+  REVERIFIED
+  LOCKED
+}
+
+enum MfaType {
+  TOTP
+  SMS
+  EMAIL
+  YUBI_KEY
+  BIOMETRIC
+  BACKUP_CODE
+}
+
+enum MfaStatus {
+  ENABLED // set up, actively enforced
+  DISABLED
+  PENDING_SETUP
+  FALLBACK_ONLY
+  LOCKED
+  REVOKED
+  EXPIRED
+}
+
+enum SessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  COMPROMISED
+  LOGGED_OUT
+  SUSPICIOUS
+  TERMINATED
+}
+
+enum LedgerEntrySource {
+  SYSTEM // scheduled accrual etc.
+  USER
+  WEBHOOK
+  TWO_LEGGED_FLOW
+  APPROVER
+}
+
+enum LedgerEntryDirection {
+  INFLOW
+  OUTFLOW
+  NO_MOVEMENT // zero-value
+}
+
+enum AuditLogActionType {
+  CREATE
+  UPDATE
+  READ
+  DELETE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  MFA_ENROLL
+  MFA_CHALLENGE
+  OTP_SENT
+  OTP_VERIFIED
+  OTP_FAILED
+  PASSWORD_CHANGED
+  KYC_SUBMITTED
+  KYC_APPROVED
+  KYC_REJECTED
+  LOAN_STATUS_CHANGED
+  LOAN_APPROVAL
+  DISBURSEMENT
+  PAYMENT
+  PAYMENT_FAILED
+  REFERRAL_CREATED
+  SETTING_CHANGED
+  ADMIN_ACTION
+  IMPERSONATION
+  SECURITY_EVENT
+  API_ACCESS
+  OTHER
+}
+
+enum Severity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ============================================================================
+// ROLES & PERMISSIONS (RBAC)
+// ============================================================================
+
+/// A granular capability, e.g. `customers:write`, `loans:disburse`.
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "loans:approve"
+  description String?
+  module      String // coarse grouping, e.g. "loans"
+  action      String // fine-grained, e.g. "approve"
+  createdBy   String? // user id or system
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RolePermission[]
+
+  @@index([module, action], map: "idx_permission_module_action")
+  @@map("permissions")
+}
+
+/// An RBAC role. May be a platform role or a tenant/customer role.
+model Role {
+  id           String   @id @default(uuid())
+  name         String   @unique // e.g. "UNDERWRITER"
+  description  String?
+  isSystem     Boolean  @default(false)
+  isAssignable Boolean  @default(true)
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       UsersOnRoles[]
+
+  @@map("roles")
+}
+
+/// Join: role -> permissions
+model RolePermission {
+  roleId       String
+  permissionId String
+  grantedBy    String? // user who granted
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Join: user -> roles
+model UsersOnRoles {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  createdBy String? // who assigned the role
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// ============================================================================
+// USERS & ADMIN USERS
+// ============================================================================
+
+/// Primary identity table. Auth-specific fields are NOT here (see Session,
+/// MFASetup, OTPRequest). All money/loan references point at the User.
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  emailVerified Boolean    @default(false)
+  phoneNumber   String?
+  phoneVerified Boolean    @default(false)
+  firstName     String
+  lastName      String
+  middleName    String?
+  photoUrl      String? // external CDN reference (Cloudflare R2)
+  status        UserStatus @default(PENDING_VERIFICATION)
+  passwordHash  String     @map("password_hash") // bcrypt/argon, never plaintext
+  lastLoginAt   DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  roles            UsersOnRoles[]
+  adminProfile     AdminUser?
+  profile          CustomerProfile?
+  kycApplications  KycApplication[]
+  referralsMade    Referral[]              @relation("Referrer")
+  referralsTaken   Referral[]              @relation("Referee")
+  eligibilityTests EligibilityEvaluation[]
+  loanApplications LoanApplication[]
+  otpRequests      OtpRequest[]
+  sessions         Session[]
+  mfaSetups        MfaSetup[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]              @relation("AuditActor")
+  Payment          Payment[]
+
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+/// Application-scoped data attached to the User (extendable).
+model CustomerProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  dateOfBirth       DateTime?
+  gender            String?   @map("gender")
+  panNumber         String?   @map("pan_number") // takes PAN if customer
+  aadhaarLastFour   String?   @map("aadhaar_last_four")
+  city              String?
+  state             String?
+  pincode           String?   @map("pincode")
+  addressLine1      String?
+  addressLine2      String?
+  occupation        String?
+  yearlyIncome      Decimal?  @db.Decimal(12, 2) // money in Decimal
+  riskScore         Int?
+  creditScore       Int?      @map("credit_score")
+  birthDateVerified Boolean   @default(false)
+  hasKycCompleted   Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("customer_profiles")
+}
+
+/// Separate table for internal admins to avoid mixing with customer identity.
+model AdminUser {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  badge        String?  @unique // work code
+  department   String?
+  level        Int      @default(1)
+  isSuperAdmin Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([department])
+  @@map("admin_users")
+}
+
+// ============================================================================
+// AUTH: SESSIONS, MFA, OTP
+// ============================================================================
+
+/// A valid session / token. Only the token-sha is stored, never the raw token.
+model Session {
+  id                String        @id @default(uuid())
+  userId            String
+  tokenSha256       String        @map("token_sha256") // hash of the access/refresh token
+  tokenType         TokenType
+  status            SessionStatus @default(ACTIVE)
+  ipAddress         String?       @map("ip_address")
+  userAgent         String?       @map("user_agent")
+  deviceFingerprint String?       @map("device_fingerprint")
+  expiresAt         DateTime      @map("expires_at")
+  lastUsedAt        DateTime?
+  revokedAt         DateTime?
+  revokedReason     String?       @map("revoked_reason")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([tokenSha256])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// OTP request. Stores ONLY a hash of the OTP (never the raw code).
+model OtpRequest {
+  id            String                @id @default(uuid())
+  userId        String
+  otpHash       String                @map("otp_hash") // sha256 of OTP; NEVER raw
+  purpose       OtpPurpose
+  channel       NotificationType
+  target        String? // email/phone it was sent to
+  status        OtpVerificationStatus @default(ACTIVE)
+  expiresAt     DateTime              @map("expires_at")
+  consumedAt    DateTime?
+  attempts      Int                   @default(0)
+  maxAttempts   Int                   @default(5)
+  cooldownUntil DateTime?
+  metadata      Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, status])
+  @@index([otpHash])
+  @@index([expiresAt])
+  @@map("otp_requests")
+}
+
+/// MFA registration. Recovery/backup codes & shared secrets are stored as
+/// hashes — never plaintext.
+model MfaSetup {
+  id                String    @id @default(uuid())
+  userId            String
+  type              MfaType
+  secretHash        String?   @map("secret_hash") // hashed secret/totp seed
+  recoveryCodesHash String[]  @map("recovery_codes_hash") // hashed one-time backup codes
+  status            MfaStatus @default(PENDING_SETUP)
+  verifiedAt        DateTime?
+  disabledAt        DateTime?
+  lastUsedAt        DateTime?
+  failureCount      Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, status])
+  @@map("mfa_setups")
+}
+
+// ============================================================================
+// KYC & COMPLIANCE
+// ============================================================================
+
+/// One KYC record per user capturing identity evidence workflow.
+model KycApplication {
+  id            String               @id @default(uuid())
+  userId        String
+  status        KycApplicationStatus @default(DRAFT)
+  referenceCode String?              @unique
+  submittedAt   DateTime?
+  reviewedAt    DateTime?
+  reviewedBy    String? // AdminUser id or User id
+  notes         String? // internal reviewer notes (not customer-facing)
+  metadata      Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  user      User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents KycDocument[]
+  decisions KycVerificationDecisionRecord[]
+
+  @@index([userId, status])
+  @@index([reviewedBy])
+  @@map("kyc_applications")
+}
+
+/// Metadata for a single submitted KYC file stored in R2. The actual file
+/// bytes/binary content is NEVER stored in the DB — only metadata + CDN ref.
+model KycDocument {
+  id               String            @id @default(uuid())
+  kycApplicationId String
+  documentType     KycDocumentType
+  status           KycDocumentStatus @default(UPLOADED)
+  fileStorageKey   String            @map("file_storage_key") // R2 object key
+  fileUrl          String?           @map("file_url") // signed/unsigned CDN URL
+  mimeType         String?           @map("mime_type")
+  fileSizeBytes    Int?
+  fileSha256       String?           @map("file_sha256") // integrity hash; detection logs
+  ocrExtracted     Json?             @map("ocr_extracted") // parsed data (PAN no, etc.)
+  expiresAt        DateTime?
+  uploadedById     String?
+  uploadedAt       DateTime          @default(now())
+  replacedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  kycApplication KycApplication                 @relation(fields: [kycApplicationId], references: [id], onDelete: Cascade)
+  verification   KycVerificationDecisionRecord?
+
+  @@index([kycApplicationId, documentType])
+  @@index([fileSha256])
+  @@map("kyc_documents")
+}
+
+/// A single verifier decision per KYC application / document.
+model KycVerificationDecisionRecord {
+  id               String                  @id @default(uuid())
+  kycApplicationId String
+  documentId       String?                 @unique
+  decision         KycVerificationDecision
+  reason           String?
+  reviewedById     String?
+  reviewedAt       DateTime                @default(now())
+  confidence       Decimal?                @db.Decimal(5, 2) // 0-100 for auto decisions
+  providerUsed     String?                 @map("provider_used") // e.g. "digilocker", "cibil", "manual"
+  metadata         Json?
+  createdAt        DateTime                @default(now())
+
+  kycApplication KycApplication @relation(fields: [kycApplicationId], references: [id], onDelete: Cascade)
+  document       KycDocument?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([kycApplicationId])
+  @@map("kyc_verification_decisions")
+}
+
+// ============================================================================
+// REFERRALS
+// ============================================================================
+
+/// First-party marketing link. Both referrer and referee are Users.
+model Referral {
+  id           String         @id @default(uuid())
+  referrerId   String
+  refereeId    String?
+  code         String         @unique // short referral code
+  status       ReferralStatus @default(PENDING)
+  rewardAmount Decimal?       @db.Decimal(12, 2)
+  paidAt       DateTime?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  referrer User  @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User? @relation("Referee", fields: [refereeId], references: [id], onDelete: SetNull)
+
+  @@index([referrerId, status])
+  @@index([code])
+  @@map("referrals")
+}
+
+// ============================================================================
+// ELIGIBILITY RULES & EVALUATIONS
+// ============================================================================
+
+/// A declaration/reference version of an eligibility criterion. Immutable
+/// snapshot when pinning to a version. Blindly modifying a rule should not
+/// change prior evaluations.
+model EligibilityRule {
+  id               String                @id @default(uuid())
+  name             String                @unique
+  key              String                @unique // stable identifier e.g. "min_age"
+  ruleType         RuleType
+  operator         Operator
+  value            Json // JSON scalar or array for IN/BETWEEN
+  description      String?
+  status           EligibilityRuleStatus @default(DRAFT)
+  version          Int                   @default(1)
+  appliedVersionId String?               @map("applied_version_id")
+  createdBy        String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  versions    EligibilityRuleVersion[]
+  evaluations EligibilityEvaluation[]
+
+  @@index([status])
+  @@map("eligibility_rules")
+}
+
+/// Specific version of a rule — set of rules for a given version is
+/// immutable once activated.
+model EligibilityRuleVersion {
+  id           String                       @id @default(uuid())
+  ruleId       String
+  version      Int
+  status       EligibilityRuleVersionStatus @default(DRAFT)
+  ruleJson     Json // full rule definition snapshot at this version
+  activatedAt  DateTime?
+  deprecatedAt DateTime?
+  activatedBy  String?
+  createdAt    DateTime                     @default(now())
+
+  rule EligibilityRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, version])
+  @@index([ruleId, status])
+  @@map("eligibility_rule_versions")
+}
+
+/// Result of evaluating eligibility for a user against a loan product.
+model EligibilityEvaluation {
+  id             String                      @id @default(uuid())
+  userId         String
+  ruleId         String?
+  loanProductId  String?
+  status         EligibilityEvaluationStatus @default(PENDING)
+  ruleValue      Json? // snapshot of the rule used
+  matched        Boolean?
+  evaluationMeta Json? // score breakdown, confidence, etc.
+  scoredResult   Decimal?                    @db.Decimal(10, 4) // derived eligibility score
+  evaluatedById  String? // for manual evaluation
+  evaluatedAt    DateTime?
+  createdAt      DateTime                    @default(now())
+
+  user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loanProduct LoanProduct?     @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
+  rule        EligibilityRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([loanProductId])
+  @@index([ruleId])
+  @@map("eligibility_evaluations")
+}
+
+// ============================================================================
+// LOAN PRODUCTS & APPLICATIONS
+// ============================================================================
+
+/// Rate cards / configuration for a type of loan.
+model LoanProduct {
+  id                String   @id @default(uuid())
+  code              String   @unique // e.g. "PL-30K-6M"
+  name              String
+  description       String?
+  minAmount         Decimal  @db.Decimal(12, 2)
+  maxAmount         Decimal  @db.Decimal(12, 2)
+  minTenureMonths   Int
+  maxTenureMonths   Int
+  baseInterestRate  Decimal  @db.Decimal(7, 4) // e.g. 0.1000 = 10% p.a.
+  processingFeeRate Decimal  @db.Decimal(7, 4) // % of loan amount
+  insuranceRate     Decimal? @db.Decimal(7, 4)
+  penaltyRate       Decimal? @db.Decimal(7, 4) // % on overdue amount
+  isActive          Boolean  @default(true)
+  rules             Json? // flexible rule set (e.g. disallowed states, cibil rules, etc.)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  applications     EligibilityEvaluation[]
+  loanApplications LoanApplication[]
+
+  @@index([isActive])
+  @@map("loan_products")
+}
+
+/// Append-only chain of state changes for an application (explicit state machine).
+model LoanApplication {
+  id                String                @id @default(uuid())
+  applicationNumber String                @unique // human-friendly number e.g. RA-2025-000123
+  userId            String
+  loanProductId     String
+  amountRequested   Decimal               @db.Decimal(12, 2)
+  tenureMonths      Int
+  interestRate      Decimal               @db.Decimal(7, 4)
+  processingFee     Decimal               @db.Decimal(12, 2)
+  downPayment       Decimal?              @db.Decimal(12, 2)
+  status            LoanApplicationStatus @default(SUBMITTED)
+  currentState      String                @default("SUBMITTED") // mirrors status machine locator
+  metadata          Json?
+  ipAddress         String?
+  submittedAt       DateTime?
+  updatedAt         DateTime              @updatedAt
+  createdAt         DateTime              @default(now())
+
+  user              User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loanProduct       LoanProduct                 @relation(fields: [loanProductId], references: [id], onDelete: Restrict)
+  stateEvents       LoanApplicationStateEvent[]
+  approvals         LoanApproval[]
+  disbursements     LoanDisbursement[]
+  repaymentSchedule RepaymentSchedule[]
+  payments          Payment[]
+  repayments        Repayment[]
+  createdById       String?
+
+  @@index([userId, status])
+  @@index([loanProductId])
+  @@index([status])
+  @@index([applicationNumber])
+  @@map("loan_applications")
+}
+
+/// Immutable audit record of every state transition an application goes
+/// through. This is how the loan state machine is made auditable.
+model LoanApplicationStateEvent {
+  id                String   @id @default(uuid())
+  loanApplicationId String
+  fromState         String
+  toState           String
+  reason            String?
+  changedByUserId   String?
+  changedByAdminId  String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  loanApplication LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([loanApplicationId, createdAt])
+  @@map("loan_application_state_events")
+}
+
+/// Approval / rejection for an application. Can have multiple over time
+/// (e.g., president approval after underwriter). Forward-only, keep history.
+model LoanApproval {
+  id                String               @id @default(uuid())
+  loanApplicationId String
+  decision          LoanApprovalDecision
+  reason            String?
+  approvedAmount    Decimal?             @db.Decimal(12, 2)
+  approvedTenure    Int?
+  approvedInterest  Decimal?             @db.Decimal(7, 4)
+  approvedById      String? // AdminUser or user
+  approvedByName    String?
+  approvedAt        DateTime             @default(now())
+  levelApproval     Int                  @default(1) // tier of approval
+  conditions        Json?
+  createdAt         DateTime             @default(now())
+
+  loanApplication LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([loanApplicationId])
+  @@index([approvedById])
+  @@map("loan_approvals")
+}
+
+/// A payout from the platform to borrower (or branch). One application can
+/// be disbursed in tranches -> multiple rows.
+model LoanDisbursement {
+  id                  String             @id @default(uuid())
+  loanApplicationId   String
+  amount              Decimal            @db.Decimal(12, 2)
+  method              DisbursementMethod
+  status              DisbursementStatus @default(PENDING)
+  attemptedAt         DateTime?
+  successAt           DateTime?
+  providerReference   String?            @map("provider_reference") // external txn id
+  beneficiaryBankName String?
+  beneficiaryAccount  String? // last4 only for display
+  beneficiaryIfsc     String?            @map("beneficiary_ifsc")
+  initiatedBy         String?
+  approvedBy          String?
+  note                String?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  loanApplication LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+  payment         Payment?        @relation(fields: [paymentId], references: [id])
+  paymentId       String?         @unique
+
+  @@index([loanApplicationId, status])
+  @@map("loan_disbursements")
+}
+
+// ============================================================================
+// REPAYMENTS, SCHEDULES, PAYMENTS
+// ============================================================================
+
+/// Scheduled EMI plan generated for a loan.
+model RepaymentSchedule {
+  id                String                  @id @default(uuid())
+  loanApplicationId String
+  sequence          Int // 1,2,3...
+  dueDate           DateTime
+  principalPortion  Decimal                 @db.Decimal(12, 2)
+  interestPortion   Decimal                 @db.Decimal(12, 2)
+  penaltyPortion    Decimal                 @default(0) @db.Decimal(12, 2)
+  totalAmount       Decimal                 @db.Decimal(12, 2)
+  paidAmount        Decimal                 @default(0) @db.Decimal(12, 2)
+  status            RepaymentScheduleStatus @default(SCHEDULED)
+  updatedAt         DateTime                @updatedAt
+  createdAt         DateTime                @default(now())
+
+  loanApplication LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+  repayments      Repayment[]
+
+  @@unique([loanApplicationId, sequence])
+  @@index([loanApplicationId, status])
+  @@index([dueDate])
+  @@map("repayment_schedules")
+}
+
+/// A repayment is a payment against a loan, optionally allocated to a
+/// specific schedule line. One schedule can have many repayments (partial).
+model Repayment {
+  id                 String          @id @default(uuid())
+  loanApplicationId  String
+  scheduleId         String?
+  paymentId          String?
+  amount             Decimal         @db.Decimal(12, 2)
+  principalAllocated Decimal         @default(0) @db.Decimal(12, 2)
+  interestAllocated  Decimal         @default(0) @db.Decimal(12, 2)
+  penaltyAllocated   Decimal         @default(0) @db.Decimal(12, 2)
+  status             RepaymentStatus @default(SCHEDULED)
+  allocatedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  loanApplication LoanApplication    @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
+  schedule        RepaymentSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  payment         Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([loanApplicationId, status])
+  @@index([scheduleId])
+  @@map("repayments")
+}
+
+/// A payment is a money-in/a money-out event from platform perspective.
+/// Split into PaymentTransaction children (principal, interest, fees...).
+model Payment {
+  id                String           @id @default(uuid())
+  externalId        String?          @unique // payment gateway reference
+  loanApplicationId String?
+  userId            String?
+  txRef             String?          @unique // our own reference
+  method            PaymentMethod
+  type              PaymentType
+  direction         PaymentDirection
+  status            PaymentStatus    @default(INITIATED)
+  amount            Decimal          @db.Decimal(12, 2)
+  currency          String           @default("INR")
+  gateway           String? // "razorpay", "cashfree", "bank"
+  gatewayRef        String?
+  initiatedById     String?
+  metadata          Json?
+  capturedAt        DateTime?
+  settledAt         DateTime?
+  failedAt          DateTime?
+  refusalReason     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  loanApplication LoanApplication?     @relation(fields: [loanApplicationId], references: [id], onDelete: SetNull)
+  user            User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  transactions    PaymentTransaction[]
+  repayment       Repayment[]
+  disbursement    LoanDisbursement?
+
+  @@index([loanApplicationId])
+  @@index([userId])
+  @@index([status])
+  @@index([capturedAt])
+  @@map("payments")
+}
+
+/// Fine-grained money breakdown for a payment. Immutable append-only.
+model PaymentTransaction {
+  id            String                 @id @default(uuid())
+  paymentId     String
+  type          PaymentTransactionType
+  amount        Decimal                @db.Decimal(12, 2)
+  currency      String                 @default("INR")
+  direction     PaymentDirection
+  ledgerEntryId String?                @unique // optional link to ledger entry
+  createdAt     DateTime               @default(now())
+  // NO updatedAt, NO update op allowed — immutable
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@map("payment_transactions")
+}
+
+// ============================================================================
+// IMMUTABLE LEDGER
+// ============================================================================
+
+/// Immutable account/ledger. Only balance can be added via append-only
+/// LedgerEntry. No update/delete.
+model Ledger {
+  id             String         @id @default(uuid())
+  name           String
+  code           String         @unique // GL code
+  type           LedgerType
+  category       LedgerCategory
+  currentBalance Decimal        @default(0) @db.Decimal(18, 2)
+  currency       String         @default("INR")
+  isSystem       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  entries LedgerEntry[]
+
+  @@index([type, category])
+  @@map("ledgers")
+}
+
+/// Append-only journal entry. Hash chain across prior entry ensures
+/// tampering is detectable. DB triggers block UPDATE/DELETE.
+model LedgerEntry {
+  id            String               @id @default(uuid())
+  ledgerId      String
+  entryType     LedgerEntryType // DEBIT | CREDIT
+  amount        Decimal              @db.Decimal(18, 2)
+  currency      String               @default("INR")
+  category      LedgerCategory
+  reference     String? // external reference (e.g., PaymentTransaction.id)
+  description   String?
+  entrySource   LedgerEntrySource    @default(SYSTEM)
+  direction     LedgerEntryDirection @default(NO_MOVEMENT)
+  txnSeq        BigInt               @unique @default(autoincrement()) // strict monotonic order
+  prevEntryHash String? // sha256 of prior entry -> chain
+  entryHash     String // sha256 of this entry payload + prevHash
+  createdAt     DateTime             @default(now())
+  // NO updatedAt -> append-only
+
+  ledger Ledger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+
+  @@index([ledgerId, createdAt])
+  @@index([txnSeq])
+  @@index([reference])
+  @@map("ledger_entries")
+}
+
+// ============================================================================
+// NOTIFICATIONS & TEMPLATES
+// ============================================================================
+
+model NotificationTemplate {
+  id              String           @id @default(uuid())
+  slug            String           @unique // e.g. "loan_disbursed"
+  titleTemplate   String
+  bodyTemplate    String
+  subjectTemplate String?
+  channel         NotificationType
+  isActive        Boolean          @default(true)
+  variables       Json? // schema of expected vars for templating
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  notifications Notification[]
+
+  @@index([channel, isActive])
+  @@map("notification_templates")
+}
+
+/// A delivery record per recipient + channel. Template variables resolved.
+model Notification {
+  id          String              @id @default(uuid())
+  userId      String?
+  templateId  String?
+  type        NotificationType
+  status      NotificationStatus  @default(QUEUED)
+  title       String?
+  body        String?
+  data        Json? // context resolved at send-time
+  channel     NotificationChannel
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  error       String? // last delivery error
+  priority    String              @default("normal")
+  referenceId String? // e.g. LoanApplication.id
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([type, status])
+  @@map("notifications")
+}
+
+// ============================================================================
+// AUDIT LOG & SYSTEM SETTINGS
+// ============================================================================
+
+/// Append-only audit trail. No update/delete.
+model AuditLog {
+  id                  String             @id @default(uuid())
+  actorIsAdminBoolean Boolean            @default(false) @map("is_admin_actor")
+  actionType          AuditLogActionType
+  entityType          String // e.g. "LoanApplication"
+  entityId            String
+  eventCategory       String
+  changedById         String? // who performed it
+  changedForUserId    String? // target user if applicable
+  severity            Severity           @default(INFO)
+  message             String?
+  diffSummary         Json? // before/after of changed fields (payload allowed in logs, NOT secrets)
+  ipAddress           String?
+  userAgent           String?
+  requestId           String?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  // NO updatedAt
+
+  actorUser User? @relation("AuditActor", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actionType])
+  @@index([changedById])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// KV store for platform/system configuration. Seeds only; secrets live in
+/// secret manager, not here.
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json // non-secret values only
+  type        String   @default("string") // string | int | decimal | json | bool
+  description String?
+  isEncrypted Boolean  @default(false) // reserved — do not store plaintext secrets
+  scope       String   @default("global") // e.g. "global", "product:PL-30K"
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scope])
+  @@map("system_settings")
+}

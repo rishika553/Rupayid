@@ -1,0 +1,32 @@
+{
+  "name": "rupayaid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RupayAid - Production-grade lending platform",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @rupayaid/web dev & pnpm --filter @rupayaid/api start:dev",
+    "dev:web": "pnpm --filter @rupayaid/web dev",
+    "dev:api": "pnpm --filter @rupayaid/api start:dev",
+    "build": "pnpm --filter @rupayaid/web build && pnpm --filter @rupayaid/api build",
+    "build:web": "pnpm --filter @rupayaid/web build",
+    "build:api": "pnpm --filter @rupayaid/api build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm -r test:e2e",
+    "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",
+    "db:generate": "pnpm --filter @rupayaid/api prisma:generate",
+    "db:push": "pnpm --filter @rupayaid/api prisma:push",
+    "db:migrate": "pnpm --filter @rupayaid/api prisma:migrate",
+    "db:seed": "pnpm --filter @rupayaid/api prisma:seed",
+    "db:studio": "pnpm --filter @rupayaid/api prisma:studio"
+  }
+}
