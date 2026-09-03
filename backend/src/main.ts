@@ -12,6 +12,8 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log'],
   });
 
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Security
   app.use(helmet());
   app.enableCors({

@@ -21,6 +21,8 @@ const redisProvider: Provider = {
         quit: async () => 'OK',
         disconnect: () => {},
         on: () => {},
+        incr: async () => 1,
+        pexpire: async () => 1,
       } as unknown as Redis;
     }
 

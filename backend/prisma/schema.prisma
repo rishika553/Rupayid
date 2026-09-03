@@ -560,7 +560,7 @@ model User {
   id            String     @id @default(uuid())
   email         String     @unique
   emailVerified Boolean    @default(false)
-  phoneNumber   String?
+  phoneNumber   String?    @unique
   phoneVerified Boolean    @default(false)
   firstName     String
   lastName      String
@@ -656,6 +656,7 @@ model Session {
   lastUsedAt        DateTime?
   revokedAt         DateTime?
   revokedReason     String?       @map("revoked_reason")
+  metadata          Json?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

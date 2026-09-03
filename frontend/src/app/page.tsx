@@ -59,7 +59,9 @@ export default function Home() {
       </div>
 
       <div className="mt-8">
-        <Button size="lg">Get Started</Button>
+        <Button size="lg" asChild>
+          <a href="/login">Get Started</a>
+        </Button>
       </div>
     </main>
   );

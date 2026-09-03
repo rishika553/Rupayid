@@ -4,6 +4,8 @@ import { createParamDecorator } from '@nestjs/common';
 export interface CurrentUserPayload {
   id: string;
   email: string;
+  sid?: string;
+  familyId?: string;
   role?: string;
   roles?: string[];
 }

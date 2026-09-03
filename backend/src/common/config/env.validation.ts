@@ -34,6 +34,26 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  OTP_PEPPER!: string;
+
+  @IsOptional()
+  @IsString()
+  REFRESH_TOKEN_SECRET!: string;
+
+  @IsOptional()
+  @IsString()
+  MSG91_AUTH_KEY!: string;
+
+  @IsOptional()
+  @IsString()
+  MSG91_TEMPLATE_ID!: string;
+
+  @IsOptional()
+  @IsString()
+  MSG91_SENDER_ID!: string;
+
+  @IsOptional()
+  @IsString()
   SENTRY_DSN!: string;
 
   @IsOptional()

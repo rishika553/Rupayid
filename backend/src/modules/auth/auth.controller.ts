@@ -1,19 +1,63 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import type { AuthService } from './auth.service';
-import type { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
+import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthService } from './auth.service';
+import type { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
+import type { RequestOtpDto, VerifyOtpDto, RefreshSessionDto } from './dto/otp-auth.dto';
+import type { OtpAuthService } from './otp-auth.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly otpAuthService: OtpAuthService,
+  ) {}
+
+  @Post('request-otp')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Request a login OTP over SMS' })
+  async requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
+    return this.otpAuthService.requestOtp(dto.phone, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Post('verify-otp')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify OTP and create a customer session' })
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+    return this.otpAuthService.verifyOtp(
+      dto.phone,
+      dto.otp,
+      dto.otpRequestId,
+      clientIp(req),
+      req.headers['user-agent'],
+    );
+  }
+
+  @Post('refresh')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rotate refresh token and issue a new access token' })
+  async refresh(@Body() dto: RefreshSessionDto, @Req() req: Request) {
+    return this.otpAuthService.refresh(dto.refreshToken, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Invalidate the current customer session' })
+  async logout(@CurrentUser() user: CurrentUserPayload) {
+    return this.otpAuthService.logout(user.id, user.familyId);
+  }
 
   @Post('login')
   @Public()
-  @ApiOperation({ summary: 'User login' })
+  @ApiOperation({ summary: 'Staff email/password login' })
   async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.authService.validateUser(dto.email, dto.password);
     return this.authService.login(user);
@@ -21,7 +65,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
-  @ApiOperation({ summary: 'User registration' })
+  @ApiOperation({ summary: 'Email/password registration' })
   async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
   }
@@ -30,6 +74,14 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   async me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.getProfile(user.id);
+    return this.otpAuthService.getMe(user.id);
   }
+}
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || 'unknown';
 }
