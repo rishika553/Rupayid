@@ -1,0 +1,5 @@
+{
+  "root": true,
+  "extends": ["./eslint.backend.js"],
+  "ignorePatterns": ["dist/", "node_modules/", "*.js"]
+}

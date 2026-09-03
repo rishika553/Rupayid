@@ -9,8 +9,8 @@
     "*.js"
   ],
   "scripts": {
-    "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix",
+    "lint": "eslint index.ts --ext .ts",
+    "lint:fix": "eslint index.ts --ext .ts --fix",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
