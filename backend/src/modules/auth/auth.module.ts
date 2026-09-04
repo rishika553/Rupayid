@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from '../user/user.module';
+import { ReferralsModule } from '../referrals/referrals.module';
 import { SmsModule } from './sms/sms.module';
 import { OtpAuthService } from './otp-auth.service';
 import { OtpGenerator } from './otp-generator';
@@ -14,6 +15,7 @@ import { OtpRateLimitService } from './otp-rate-limit.service';
 @Module({
   imports: [
     UserModule,
+    ReferralsModule,
     SmsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

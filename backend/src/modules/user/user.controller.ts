@@ -1,6 +1,6 @@
 import { Controller, Get, Patch, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import type { UserService } from './user.service';
+import { UserService } from './user.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { PaginationDto} from '../../common/decorators/api-paginated.decorator';
 import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.decorator';
@@ -20,13 +20,15 @@ export class UserController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
+  @Roles('ADMIN', 'SUPPORT')
+  @ApiOperation({ summary: 'Get user by ID (staff only)' })
   async findOne(@Param('id') id: string) {
-    return this.userService.findById(id);
+    return this.userService.findPublicById(id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update user profile' })
+  @Roles('ADMIN', 'SUPPORT')
+  @ApiOperation({ summary: 'Update a user (staff only)' })
   async update(
     @Param('id') id: string,
     @Body() data: { firstName?: string; lastName?: string; phoneNumber?: string },

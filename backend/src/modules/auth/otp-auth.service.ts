@@ -8,11 +8,11 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import type { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { hashOtp, parseDurationToMs, sha256, timingSafeEqualHex } from './crypto.util';
 import {
   ACCOUNT_BLOCKED,
@@ -21,11 +21,12 @@ import {
   GENERIC_OTP_SENT,
   OTP_CONFIG,
 } from './otp.constants';
-import type { OtpGenerator } from './otp-generator';
-import type { OtpRateLimitService } from './otp-rate-limit.service';
+import { OtpGenerator } from './otp-generator';
+import { OtpRateLimitService } from './otp-rate-limit.service';
 import { maskPhone, normalizeIndianMobile } from './phone.util';
 import { SMS_PROVIDER } from './sms/sms-provider';
 import type { SmsProvider } from './sms/sms-provider';
+import { ReferralsService } from '../referrals/referrals.service';
 
 const SELECT_USER = {
   id: true,
@@ -49,6 +50,7 @@ export class OtpAuthService {
     private readonly otpGenerator: OtpGenerator,
     private readonly rateLimit: OtpRateLimitService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
+    private readonly referrals: ReferralsService,
   ) {}
 
   async requestOtp(rawPhone: string, ip: string, userAgent?: string) {
@@ -59,7 +61,7 @@ export class OtpAuthService {
       OTP_CONFIG.requestPerIp.windowMs,
     );
 
-    const user = await this.findOrCreateCustomer(phone);
+    const user = await this.findOrCreateCustomer(phone, ip, userAgent);
     if (this.isBlocked(user.status)) {
       this.logger.warn(`OTP request skipped for blocked account ${maskPhone(phone)}`);
       return this.genericRequestResponse();
@@ -127,7 +129,14 @@ export class OtpAuthService {
     };
   }
 
-  async verifyOtp(rawPhone: string, otp: string, otpRequestId: string, ip: string, userAgent?: string) {
+  async verifyOtp(
+    rawPhone: string,
+    otp: string,
+    otpRequestId: string,
+    ip: string,
+    userAgent?: string,
+    referralCode?: string,
+  ) {
     const phone = normalizeIndianMobile(rawPhone);
 
     await this.rateLimit.assertWithinLimit(
@@ -190,6 +199,7 @@ export class OtpAuthService {
       throw new UnauthorizedException(GENERIC_OTP_INVALID);
     }
 
+    const firstVerification = !user.phoneVerified;
     const familyId = crypto.randomUUID();
     const now = new Date();
     const accessTtl = parseDurationToMs(this.configService.get<string>('JWT_EXPIRES_IN', '15m'));
@@ -259,6 +269,14 @@ export class OtpAuthService {
     ]);
 
     this.logger.log(`OTP verified for ${maskPhone(phone)} session family ${familyId}`);
+
+    await this.referrals.applyAtFirstVerification({
+      refereeId: user.id,
+      rawCode: referralCode,
+      firstVerification,
+      ip,
+      userAgent,
+    });
 
     return {
       accessToken: tokens.accessToken,
@@ -497,9 +515,12 @@ export class OtpAuthService {
     });
   }
 
-  private async findOrCreateCustomer(phone: string) {
+  private async findOrCreateCustomer(phone: string, ip?: string, userAgent?: string) {
     const existing = await this.prisma.user.findUnique({ where: { phoneNumber: phone } });
     if (existing) {
+      if (!existing.referralCode) {
+        await this.referrals.provisionForUser(existing.id, ip, userAgent);
+      }
       return existing;
     }
 
@@ -507,7 +528,7 @@ export class OtpAuthService {
     const digits = phone.replace(/\D/g, '');
     const borrower = await this.prisma.role.findUnique({ where: { name: 'BORROWER' } });
 
-    return this.prisma.user.create({
+    const created = await this.prisma.user.create({
       data: {
         email: `otp.${digits}@users.rupayaid.internal`,
         passwordHash,
@@ -523,5 +544,7 @@ export class OtpAuthService {
           : undefined,
       },
     });
+    await this.referrals.provisionForUser(created.id, ip, userAgent);
+    return created;
   }
 }

@@ -1,20 +1,21 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import type { ReactNode } from 'react';
+import { Source_Sans_3 } from 'next/font/google';
 import './globals.css';
-import { QueryProvider } from '@/components/providers/query-provider';
+import { AppProviders } from '@/components/providers/app-providers';
 
-const inter = Inter({ subsets: ['latin'] });
+const sans = Source_Sans_3({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: 'RupayAid',
-  description: 'Production-grade lending platform',
+  description: 'Personal loans with clear terms and careful underwriting.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <QueryProvider>{children}</QueryProvider>
+      <body className={sans.className}>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

@@ -193,8 +193,11 @@ async function main() {
 
   const customerHash = await bcrypt.hash('customer@123', 12);
   const customers = [];
+  let customerIndex = 0;
 
   for (const c of customerData) {
+    customerIndex += 1;
+    const referralCode = `RAP-DEMO${String(customerIndex).padStart(4, '0')}`;
     const user = await prisma.user.upsert({
       where: { email: c.email },
       create: {
@@ -206,11 +209,16 @@ async function main() {
         phoneNumber: c.phone,
         status: UserStatus.ACTIVE,
         passwordHash: customerHash,
+        referralCode,
+        referralCodeCreatedAt: new Date(),
         roles: {
           create: [{ roleId: roles['BORROWER'] }],
         },
       },
-      update: {},
+      update: {
+        referralCode,
+        referralCodeCreatedAt: new Date(),
+      },
     });
 
     await prisma.customerProfile.upsert({
@@ -413,6 +421,26 @@ async function main() {
         reviewedAt: new Date('2025-01-16'),
         reviewedBy: underwriterUser.id,
         notes: 'All documents verified',
+        details: {
+          create: {
+            dateOfBirth: new Date('1994-03-12'),
+            gender: 'FEMALE',
+            fatherOrSpouseName: 'Imran Khan',
+            maritalStatus: 'SINGLE',
+            addressLine1: '12 MG Road',
+            city: 'Bengaluru',
+            state: 'Karnataka',
+            pincode: '560001',
+            panLastFour: '1234',
+            aadhaarLastFour: '6789',
+            idDocumentType: 'AADHAAR_CARD',
+            accountHolderName: 'Aisha Khan',
+            accountLastFour: '4321',
+            ifsc: 'HDFC0001234',
+            bankName: 'HDFC Bank',
+            accountType: 'SAVINGS',
+          },
+        },
       },
     });
 
@@ -421,8 +449,8 @@ async function main() {
         kycApplicationId: kyc.id,
         documentType: 'AADHAAR_CARD',
         status: 'VERIFIED',
-        fileStorageKey: 'kyc/aisha/001-aadhaar.pdf',
-        fileUrl: 'https://rupayaid-cdn.example.com/kyc/aisha/001-aadhaar.pdf',
+        fileStorageKey: `kyc/${cust.id}/${kyc.id}/001-aadhaar.pdf`,
+        fileUrl: null,
         mimeType: 'application/pdf',
         fileSizeBytes: 204800,
         fileSha256: 'abcdef1234567890',

@@ -4,10 +4,10 @@ import type { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { AuthService } from './auth.service';
+import { AuthService } from './auth.service';
 import type { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
 import type { RequestOtpDto, VerifyOtpDto, RefreshSessionDto } from './dto/otp-auth.dto';
-import type { OtpAuthService } from './otp-auth.service';
+import { OtpAuthService } from './otp-auth.service';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -36,6 +36,7 @@ export class AuthController {
       dto.otpRequestId,
       clientIp(req),
       req.headers['user-agent'],
+      dto.referralCode,
     );
   }
 

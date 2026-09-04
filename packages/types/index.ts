@@ -23,13 +23,12 @@ export const UserStatus = {
 export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus];
 
 export const KycApplicationStatus = {
-  NOT_SUBMITTED: 'NOT_SUBMITTED',
   DRAFT: 'DRAFT',
   SUBMITTED: 'SUBMITTED',
   UNDER_REVIEW: 'UNDER_REVIEW',
-  MORE_INFO_REQUIRED: 'MORE_INFO_REQUIRED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+  RESUBMISSION_REQUIRED: 'RESUBMISSION_REQUIRED',
 } as const;
 export type KycApplicationStatus = (typeof KycApplicationStatus)[keyof typeof KycApplicationStatus];
 

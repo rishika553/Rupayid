@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import type { RolesService } from './roles.service';
+import { RolesService } from './roles.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('roles')

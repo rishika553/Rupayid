@@ -1,42 +1,36 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import type { ReferralsService } from './referrals.service';
-import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { ValidateReferralDto } from './dto/referral.dto';
+import { ReferralsService } from './referrals.service';
 
 @ApiTags('referrals')
 @Controller('referrals')
-@ApiBearerAuth()
 export class ReferralsController {
   constructor(private readonly referralsService: ReferralsService) {}
 
-  @Post()
-  @ApiOperation({ summary: 'Create a referral code' })
-  async create(@CurrentUser() user: CurrentUserPayload) {
-    return this.referralsService.createReferral(user.id);
+  @Post('validate')
+  @Public()
+  @ApiOperation({ summary: 'Check whether a referral code can be used at sign-up' })
+  async validate(@Body() dto: ValidateReferralDto, @Req() req: Request) {
+    return this.referralsService.validateCode(dto.code, clientIp(req));
   }
 
-  @Get('my')
-  @ApiOperation({ summary: 'Get my referrals' })
-  async myReferrals(@CurrentUser() user: CurrentUserPayload) {
-    return this.referralsService.findByReferrer(user.id);
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current customer referral code and relationships' })
+  async me(@CurrentUser() user: CurrentUserPayload) {
+    return this.referralsService.getMine(user.id);
   }
+}
 
-  @Get('stats')
-  @ApiOperation({ summary: 'Get referral statistics' })
-  async stats(@CurrentUser() user: CurrentUserPayload) {
-    return this.referralsService.getReferralStats(user.id);
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
   }
-
-  @Get('code/:code')
-  @ApiOperation({ summary: 'Look up referral by code' })
-  async findByCode(@Param('code') code: string) {
-    return this.referralsService.findByCode(code);
-  }
-
-  @Post('accept/:code')
-  @ApiOperation({ summary: 'Accept a referral' })
-  async accept(@Param('code') code: string, @CurrentUser() user: CurrentUserPayload) {
-    return this.referralsService.acceptReferral(code, user.id);
-  }
+  return req.ip || 'unknown';
 }

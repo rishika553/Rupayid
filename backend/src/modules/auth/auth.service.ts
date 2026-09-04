@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import type { UserService } from '../user/user.service';
+import { UserService } from '../user/user.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import type { RegisterDto, AuthResponseDto } from './dto/auth.dto';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly referrals: ReferralsService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -61,6 +63,7 @@ export class AuthService {
       phoneNumber: dto.phoneNumber,
     });
 
+    await this.referrals.provisionForUser(user.id);
     return this.login(user);
   }
 

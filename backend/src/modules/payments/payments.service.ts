@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { v4 as uuid } from 'uuid';
 
 @Injectable()
@@ -28,7 +29,7 @@ export class PaymentsService {
         type: data.type as never,
         direction: data.direction as never,
         status: 'INITIATED',
-        amount: data.amount,
+        amount: new Prisma.Decimal(String(data.amount)),
         gateway: data.gateway,
         initiatedById: data.initiatedById,
         metadata: (data.metadata || undefined) as never,
@@ -77,7 +78,7 @@ export class PaymentsService {
       data: {
         paymentId,
         type: data.type as never,
-        amount: data.amount,
+        amount: new Prisma.Decimal(String(data.amount)),
         direction: data.direction as never,
         currency: data.currency || 'INR',
       },

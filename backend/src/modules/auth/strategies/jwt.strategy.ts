@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
-import type { UserService } from '../../user/user.service';
-import type { OtpAuthService } from '../otp-auth.service';
+import { UserService } from '../../user/user.service';
+import { OtpAuthService } from '../otp-auth.service';
 import { BLOCKED_USER_STATUSES } from '../otp.constants';
 
 @Injectable()
@@ -48,11 +48,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       familyId = session.familyId;
     }
 
+    const roles = await this.userService.getRoleNames(user.id);
     return {
       id: user.id,
       email: user.email,
       sid: payload.sid,
       familyId,
+      roles,
+      role: roles[0],
     };
   }
 }

@@ -57,6 +57,7 @@ async function bootstrap() {
     )
     .addTag('auth', 'Authentication & registration')
     .addTag('users', 'User management')
+    .addTag('customers', 'Customer profile')
     .addTag('admin', 'Admin operations')
     .addTag('roles', 'RBAC roles & permissions')
     .addTag('kyc', 'KYC applications & verification')

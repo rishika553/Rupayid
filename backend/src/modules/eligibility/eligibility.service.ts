@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class EligibilityService {
@@ -50,8 +50,18 @@ export class EligibilityService {
           userId,
           loanProductId: loanProductId || null,
           ruleId: rule.id,
+          ruleVersionId: rule.appliedVersionId,
           status: 'PENDING',
           ruleValue: rule.value as never,
+          snapshotJson: {
+            ruleKey: rule.key,
+            ruleName: rule.name,
+            ruleType: rule.ruleType,
+            operator: rule.operator,
+            value: rule.value,
+            version: rule.version,
+            appliedVersionId: rule.appliedVersionId,
+          } as never,
         },
       });
 

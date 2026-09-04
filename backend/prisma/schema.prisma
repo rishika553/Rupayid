@@ -45,6 +45,7 @@ enum KycApplicationStatus {
   SUBMITTED
   UNDER_REVIEW
   MORE_INFO_REQUIRED
+  RESUBMISSION_REQUIRED
   APPROVED
   REJECTED
 }
@@ -459,14 +460,21 @@ enum AuditLogActionType {
   OTP_FAILED
   PASSWORD_CHANGED
   KYC_SUBMITTED
+  KYC_CREATED
+  KYC_UPDATED
+  KYC_DOCUMENT_UPLOADED
   KYC_APPROVED
   KYC_REJECTED
+  PROFILE_UPDATED
   LOAN_STATUS_CHANGED
   LOAN_APPROVAL
   DISBURSEMENT
   PAYMENT
   PAYMENT_FAILED
   REFERRAL_CREATED
+  REFERRAL_CODE_GENERATED
+  REFERRAL_APPLIED
+  REFERRAL_REJECTED
   SETTING_CHANGED
   ADMIN_ACTION
   IMPERSONATION
@@ -570,6 +578,8 @@ model User {
   passwordHash  String     @map("password_hash") // bcrypt/argon, never plaintext
   lastLoginAt   DateTime?
   deletedAt     DateTime?
+  referralCode          String?   @unique @map("referral_code")
+  referralCodeCreatedAt DateTime? @map("referral_code_created_at")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -587,9 +597,11 @@ model User {
   notifications    Notification[]
   auditLogs        AuditLog[]              @relation("AuditActor")
   Payment          Payment[]
+  ledgers          Ledger[]
 
   @@index([email])
   @@index([status])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -599,7 +611,8 @@ model CustomerProfile {
   userId            String    @unique
   dateOfBirth       DateTime?
   gender            String?   @map("gender")
-  panNumber         String?   @map("pan_number") // takes PAN if customer
+  panNumber         String?   @map("pan_number") // legacy; prefer panLastFour
+  panLastFour       String?   @map("pan_last_four")
   aadhaarLastFour   String?   @map("aadhaar_last_four")
   city              String?
   state             String?
@@ -612,12 +625,14 @@ model CustomerProfile {
   creditScore       Int?      @map("credit_score")
   birthDateVerified Boolean   @default(false)
   hasKycCompleted   Boolean   @default(false)
+  deletedAt         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([pincode])
   @@map("customer_profiles")
 }
 
@@ -646,7 +661,7 @@ model AdminUser {
 model Session {
   id                String        @id @default(uuid())
   userId            String
-  tokenSha256       String        @map("token_sha256") // hash of the access/refresh token
+  tokenSha256       String        @unique @map("token_sha256") // hash of the access/refresh token
   tokenType         TokenType
   status            SessionStatus @default(ACTIVE)
   ipAddress         String?       @map("ip_address")
@@ -663,7 +678,6 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
-  @@index([tokenSha256])
   @@index([expiresAt])
   @@map("sessions")
 }
@@ -735,12 +749,45 @@ model KycApplication {
   updatedAt     DateTime             @updatedAt
 
   user      User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents KycDocument[]
-  decisions KycVerificationDecisionRecord[]
+  details     KycDetails?
+  documents   KycDocument[]
+  decisions   KycVerificationDecisionRecord[]
+  submissions KycSubmissionHistory[]
 
   @@index([userId, status])
   @@index([reviewedBy])
   @@map("kyc_applications")
+}
+
+/// Structured KYC form data. Full Aadhaar/PAN/account numbers are never stored.
+model KycDetails {
+  id                 String    @id @default(uuid())
+  kycApplicationId   String    @unique
+  dateOfBirth        DateTime?
+  gender             String?
+  fatherOrSpouseName String?
+  maritalStatus      String?
+  nationality        String?   @default("IN")
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  state              String?
+  pincode            String?
+  residenceType      String?
+  panLastFour        String?
+  aadhaarLastFour    String?
+  idDocumentType     String?
+  accountHolderName  String?
+  accountLastFour    String?
+  ifsc               String?
+  bankName           String?
+  accountType        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  application KycApplication @relation(fields: [kycApplicationId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_details")
 }
 
 /// Metadata for a single submitted KYC file stored in R2. The actual file
@@ -750,8 +797,8 @@ model KycDocument {
   kycApplicationId String
   documentType     KycDocumentType
   status           KycDocumentStatus @default(UPLOADED)
-  fileStorageKey   String            @map("file_storage_key") // R2 object key
-  fileUrl          String?           @map("file_url") // signed/unsigned CDN URL
+  fileStorageKey   String            @map("file_storage_key") // private R2 object key — never a public URL
+  fileUrl          String?           @map("file_url") // deprecated; do not store public CDN URLs
   mimeType         String?           @map("mime_type")
   fileSizeBytes    Int?
   fileSha256       String?           @map("file_sha256") // integrity hash; detection logs
@@ -792,17 +839,34 @@ model KycVerificationDecisionRecord {
   @@map("kyc_verification_decisions")
 }
 
+/// Append-only snapshot of each KYC status change / customer submission.
+model KycSubmissionHistory {
+  id               String                @id @default(uuid())
+  kycApplicationId String
+  fromStatus       KycApplicationStatus?
+  toStatus         KycApplicationStatus
+  snapshot         Json?
+  createdById      String?
+  createdAt        DateTime              @default(now())
+
+  application KycApplication @relation(fields: [kycApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([kycApplicationId, createdAt])
+  @@index([toStatus])
+  @@map("kyc_submission_history")
+}
+
 // ============================================================================
 // REFERRALS
 // ============================================================================
 
-/// First-party marketing link. Both referrer and referee are Users.
+/// A customer's shareable code lives on User. This row is one referee using that code.
 model Referral {
   id           String         @id @default(uuid())
   referrerId   String
-  refereeId    String?
-  code         String         @unique // short referral code
-  status       ReferralStatus @default(PENDING)
+  refereeId    String         @unique
+  code         String
+  status       ReferralStatus @default(ACCEPTED)
   rewardAmount Decimal?       @db.Decimal(12, 2)
   paidAt       DateTime?
   metadata     Json?
@@ -810,8 +874,9 @@ model Referral {
   updatedAt    DateTime       @updatedAt
 
   referrer User  @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referee  User? @relation("Referee", fields: [refereeId], references: [id], onDelete: SetNull)
+  referee  User  @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
 
+  @@unique([referrerId, refereeId])
   @@index([referrerId, status])
   @@index([code])
   @@map("referrals")
@@ -858,8 +923,10 @@ model EligibilityRuleVersion {
   deprecatedAt DateTime?
   activatedBy  String?
   createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
 
-  rule EligibilityRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule        EligibilityRule           @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  evaluations EligibilityEvaluation[]
 
   @@unique([ruleId, version])
   @@index([ruleId, status])
@@ -868,26 +935,34 @@ model EligibilityRuleVersion {
 
 /// Result of evaluating eligibility for a user against a loan product.
 model EligibilityEvaluation {
-  id             String                      @id @default(uuid())
-  userId         String
-  ruleId         String?
-  loanProductId  String?
-  status         EligibilityEvaluationStatus @default(PENDING)
-  ruleValue      Json? // snapshot of the rule used
-  matched        Boolean?
-  evaluationMeta Json? // score breakdown, confidence, etc.
-  scoredResult   Decimal?                    @db.Decimal(10, 4) // derived eligibility score
-  evaluatedById  String? // for manual evaluation
-  evaluatedAt    DateTime?
-  createdAt      DateTime                    @default(now())
+  id                String                      @id @default(uuid())
+  userId            String
+  ruleId            String?
+  ruleVersionId     String?
+  loanProductId     String?
+  loanApplicationId String?
+  status            EligibilityEvaluationStatus @default(PENDING)
+  ruleValue         Json? // snapshot of the rule used
+  matched           Boolean?
+  evaluationMeta    Json? // score breakdown, confidence, etc.
+  snapshotJson      Json? // full historical evaluation snapshot (inputs + outputs)
+  scoredResult      Decimal?                    @db.Decimal(10, 4) // derived eligibility score
+  evaluatedById     String? // for manual evaluation
+  evaluatedAt       DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
-  user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  loanProduct LoanProduct?     @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
-  rule        EligibilityRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  user            User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loanProduct     LoanProduct?            @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
+  rule            EligibilityRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleVersion     EligibilityRuleVersion? @relation(fields: [ruleVersionId], references: [id], onDelete: SetNull)
+  loanApplication LoanApplication?        @relation(fields: [loanApplicationId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@index([loanProductId])
+  @@index([loanApplicationId])
   @@index([ruleId])
+  @@index([ruleVersionId])
   @@map("eligibility_evaluations")
 }
 
@@ -947,8 +1022,9 @@ model LoanApplication {
   disbursements     LoanDisbursement[]
   repaymentSchedule RepaymentSchedule[]
   payments          Payment[]
-  repayments        Repayment[]
-  createdById       String?
+  repayments              Repayment[]
+  eligibilityEvaluations  EligibilityEvaluation[]
+  createdById             String?
 
   @@index([userId, status])
   @@index([loanProductId])
@@ -1008,9 +1084,10 @@ model LoanDisbursement {
   amount              Decimal            @db.Decimal(12, 2)
   method              DisbursementMethod
   status              DisbursementStatus @default(PENDING)
+  txRef               String?            @unique @map("tx_ref")
   attemptedAt         DateTime?
   successAt           DateTime?
-  providerReference   String?            @map("provider_reference") // external txn id
+  providerReference   String?            @unique @map("provider_reference") // external txn id
   beneficiaryBankName String?
   beneficiaryAccount  String? // last4 only for display
   beneficiaryIfsc     String?            @map("beneficiary_ifsc")
@@ -1044,6 +1121,7 @@ model RepaymentSchedule {
   penaltyPortion    Decimal                 @default(0) @db.Decimal(12, 2)
   totalAmount       Decimal                 @db.Decimal(12, 2)
   paidAmount        Decimal                 @default(0) @db.Decimal(12, 2)
+  paidAt            DateTime?
   status            RepaymentScheduleStatus @default(SCHEDULED)
   updatedAt         DateTime                @updatedAt
   createdAt         DateTime                @default(now())
@@ -1090,6 +1168,7 @@ model Payment {
   loanApplicationId String?
   userId            String?
   txRef             String?          @unique // our own reference
+  idempotencyKey    String?          @unique @map("idempotency_key")
   method            PaymentMethod
   type              PaymentType
   direction         PaymentDirection
@@ -1097,7 +1176,7 @@ model Payment {
   amount            Decimal          @db.Decimal(12, 2)
   currency          String           @default("INR")
   gateway           String? // "razorpay", "cashfree", "bank"
-  gatewayRef        String?
+  gatewayRef        String? // provider reference
   initiatedById     String?
   metadata          Json?
   capturedAt        DateTime?
@@ -1117,6 +1196,7 @@ model Payment {
   @@index([userId])
   @@index([status])
   @@index([capturedAt])
+  @@index([gatewayRef])
   @@map("payments")
 }
 
@@ -1146,6 +1226,7 @@ model PaymentTransaction {
 /// LedgerEntry. No update/delete.
 model Ledger {
   id             String         @id @default(uuid())
+  userId         String?
   name           String
   code           String         @unique // GL code
   type           LedgerType
@@ -1156,9 +1237,11 @@ model Ledger {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   entries LedgerEntry[]
 
   @@index([type, category])
+  @@index([userId])
   @@map("ledgers")
 }
 
@@ -1167,6 +1250,8 @@ model Ledger {
 model LedgerEntry {
   id            String               @id @default(uuid())
   ledgerId      String
+  userId        String?
+  paymentId     String?
   entryType     LedgerEntryType // DEBIT | CREDIT
   amount        Decimal              @db.Decimal(18, 2)
   currency      String               @default("INR")
@@ -1186,6 +1271,8 @@ model LedgerEntry {
   @@index([ledgerId, createdAt])
   @@index([txnSeq])
   @@index([reference])
+  @@index([userId])
+  @@index([paymentId])
   @@map("ledger_entries")
 }
 
@@ -1217,6 +1304,7 @@ model Notification {
   userId      String?
   templateId  String?
   type        NotificationType
+  eventType   String?             @map("event_type")
   status      NotificationStatus  @default(QUEUED)
   title       String?
   body        String?
@@ -1235,6 +1323,7 @@ model Notification {
 
   @@index([userId, status])
   @@index([type, status])
+  @@index([eventType])
   @@map("notifications")
 }
 

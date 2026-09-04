@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class LoansService {
@@ -21,10 +22,12 @@ export class LoansService {
         applicationNumber,
         userId,
         loanProductId: data.loanProductId,
-        amountRequested: data.amountRequested,
+        amountRequested: new Prisma.Decimal(String(data.amountRequested)),
         tenureMonths: data.tenureMonths,
         interestRate: product.baseInterestRate,
-        processingFee: Number(product.processingFeeRate) * data.amountRequested,
+        processingFee: new Prisma.Decimal(product.processingFeeRate.toString()).mul(
+          new Prisma.Decimal(String(data.amountRequested)),
+        ),
         status: 'SUBMITTED',
         currentState: 'SUBMITTED',
         submittedAt: new Date(),

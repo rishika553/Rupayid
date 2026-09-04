@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Length, Matches } from 'class-validator';
+import { IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator';
 
 export class RequestOtpDto {
   @ApiProperty({ example: '+919876543210', description: 'Indian mobile number' })
@@ -23,6 +23,13 @@ export class VerifyOtpDto {
   @ApiProperty({ format: 'uuid' })
   @IsString()
   otpRequestId!: string;
+
+  @ApiProperty({ required: false, example: 'RAP-A1B2C3D4' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Matches(/^RAP-[A-Z0-9]{8}$/i, { message: 'Enter a valid referral code' })
+  referralCode?: string;
 }
 
 export class RefreshSessionDto {

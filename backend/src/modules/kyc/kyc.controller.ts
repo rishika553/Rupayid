@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import type { KycService } from './kyc.service';
-import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { PaginationDto} from '../../common/decorators/api-paginated.decorator';
-import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { ConfirmKycDocumentDto, RequestKycUploadDto, UpsertKycDetailsDto } from './dto/kyc.dto';
+import { KycService } from './kyc.service';
 
 @ApiTags('kyc')
 @Controller('kyc')
@@ -13,10 +13,66 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class KycController {
   constructor(private readonly kycService: KycService) {}
 
+  @Post()
+  @ApiOperation({ summary: 'Create a KYC application for the current customer' })
+  async create(@CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
+    return this.kycService.createMine(user.id, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get the current customer KYC package' })
+  async me(@CurrentUser() user: CurrentUserPayload) {
+    return this.kycService.getMine(user.id);
+  }
+
+  @Patch('me')
+  @ApiOperation({ summary: 'Update personal, address, identity, and bank KYC fields' })
+  async update(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: UpsertKycDetailsDto,
+    @Req() req: Request,
+  ) {
+    return this.kycService.updateMine(user.id, dto, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Post('submit')
+  @ApiOperation({ summary: 'Submit the current KYC application for review' })
+  async submit(@CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
+    return this.kycService.submitMine(user.id, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Get('status')
+  @ApiOperation({ summary: 'Get KYC status for the current customer' })
+  async status(@CurrentUser() user: CurrentUserPayload) {
+    return this.kycService.getStatus(user.id);
+  }
+
+  @Post('documents/upload-url')
+  @ApiOperation({ summary: 'Issue a time-limited R2 signed upload URL' })
+  async uploadUrl(@CurrentUser() user: CurrentUserPayload, @Body() dto: RequestKycUploadDto) {
+    return this.kycService.requestUpload(user.id, dto);
+  }
+
+  @Post('documents')
+  @ApiOperation({ summary: 'Confirm a KYC document after a successful R2 upload' })
+  async confirmDocument(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: ConfirmKycDocumentDto,
+    @Req() req: Request,
+  ) {
+    return this.kycService.confirmDocument(user.id, dto, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Get('documents/:id/url')
+  @ApiOperation({ summary: 'Issue a time-limited signed download URL for an owned document' })
+  async documentUrl(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
+    return this.kycService.getDocumentDownloadUrl(user.id, id);
+  }
+
   @Post('applications')
-  @ApiOperation({ summary: 'Create or get existing KYC application' })
-  async createApplication(@CurrentUser() user: CurrentUserPayload) {
-    return this.kycService.createApplication(user.id);
+  @ApiOperation({ summary: 'Create or return the current KYC application' })
+  async createApplication(@CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
+    return this.kycService.createMine(user.id, clientIp(req), req.headers['user-agent']);
   }
 
   @Get('applications/my')
@@ -27,38 +83,22 @@ export class KycController {
 
   @Get('applications/pending')
   @Roles('UNDERWRITER', 'ADMIN')
-  @ApiPaginatedResponse()
   @ApiOperation({ summary: 'List pending KYC reviews' })
-  async pendingReviews(@Query() pagination: PaginationDto) {
-    return this.kycService.listPendingReviews(pagination.page, pagination.limit);
+  async pendingReviews() {
+    return this.kycService.listPendingReviews();
   }
 
   @Get('applications/:id')
-  @ApiOperation({ summary: 'Get KYC application by ID' })
-  async findOne(@Param('id') id: string) {
-    return this.kycService.findById(id);
+  @ApiOperation({ summary: 'Get a KYC application if the caller owns it or is staff' })
+  async findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.kycService.findById(id, user.id);
   }
 
   @Post('applications/:id/submit')
-  @ApiOperation({ summary: 'Submit KYC application for review' })
-  async submit(@Param('id') id: string) {
-    return this.kycService.submit(id);
-  }
-
-  @Post('applications/:id/documents')
-  @ApiOperation({ summary: 'Add document to KYC application' })
-  async addDocument(
-    @Param('id') id: string,
-    @Body() data: {
-      documentType: string;
-      fileStorageKey: string;
-      fileUrl?: string;
-      mimeType?: string;
-      fileSizeBytes?: number;
-      fileSha256?: string;
-    },
-  ) {
-    return this.kycService.addDocument(id, data);
+  @ApiOperation({ summary: 'Submit KYC (owner only)' })
+  async submitById(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
+    await this.kycService.findById(id, user.id);
+    return this.kycService.submitMine(user.id, clientIp(req), req.headers['user-agent']);
   }
 
   @Patch('applications/:id/review')
@@ -71,4 +111,12 @@ export class KycController {
   ) {
     return this.kycService.reviewDecision(id, { ...data, reviewedById: user.id });
   }
+}
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || 'unknown';
 }

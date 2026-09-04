@@ -1,104 +1,129 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@rupayaid/ui';
-import { apiClient } from '@/lib/api-client';
-import { writeAuth } from '@/lib/auth-storage';
+import { Label } from '@/components/ui/label';
+import { useAuth } from '@/components/providers/auth-provider';
+import { apiClient, requireApi } from '@/lib/api-client';
 
-export default function LoginPage() {
+const schema = z.object({
+  phone: z
+    .string()
+    .regex(/^(\+91)?[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
+  referralCode: z
+    .string()
+    .regex(/^$|^RAP-[A-Za-z0-9]{8}$/i, 'Use a code like RAP-ABCD2345'),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+function LoginForm() {
   const router = useRouter();
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpRequestId, setOtpRequestId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const search = useSearchParams();
+  const { requestOtp } = useAuth();
+  const [formError, setFormError] = useState<string | null>(null);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { phone: '', referralCode: '' },
+  });
 
-  async function requestOtp(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-    const response = await apiClient.post<{
-      otpRequestId: string | null;
-      message: string;
-      expiresAt: string;
-    }>('/auth/request-otp', { phone });
-    setLoading(false);
-    if (!response.success || !response.data?.otpRequestId) {
-      setError(response.error || 'Unable to send OTP');
-      return;
+  useEffect(() => {
+    const ref = search.get('ref');
+    if (ref) {
+      form.setValue('referralCode', ref.toUpperCase());
     }
-    setOtpRequestId(response.data.otpRequestId);
-    setMessage(response.data.message);
-  }
+  }, [form, search]);
 
-  async function verifyOtp(event: React.FormEvent) {
-    event.preventDefault();
-    if (!otpRequestId) {
-      return;
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const code = values.referralCode.trim().toUpperCase();
+    if (code) {
+      try {
+        const result = await requireApi(
+          apiClient.post<{ valid: boolean; reason?: string }>('/referrals/validate', { code }),
+        );
+        if (!result.valid) {
+          setFormError(
+            result.reason === 'self'
+              ? 'You cannot use your own referral code'
+              : 'That referral code is not valid',
+          );
+          return;
+        }
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : 'Could not check referral code');
+        return;
+      }
     }
-    setError(null);
-    setLoading(true);
-    const response = await apiClient.post<{
-      accessToken: string;
-      refreshToken: string;
-    }>('/auth/verify-otp', { phone, otp, otpRequestId });
-    setLoading(false);
-    if (!response.success || !response.data?.accessToken) {
-      setError(response.error || 'Invalid OTP');
-      return;
+    try {
+      await requestOtp(values.phone, code || undefined);
+      router.push('/verify-otp');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Could not send OTP');
     }
-    writeAuth({
-      accessToken: response.data.accessToken,
-      refreshToken: response.data.refreshToken,
-    });
-    apiClient.setTokens(response.data);
-    router.push('/dashboard');
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
+    <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Customer sign in</CardTitle>
-          <CardDescription>We will send a one-time code to your mobile number.</CardDescription>
+          <CardTitle>Sign in</CardTitle>
+          <CardDescription>We will send a one-time code to your mobile number. No password.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!otpRequestId ? (
-            <form className="space-y-4" onSubmit={requestOtp}>
+          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Mobile number</Label>
               <Input
+                id="phone"
                 inputMode="numeric"
                 autoComplete="tel"
                 placeholder="9876543210"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                required
+                aria-invalid={Boolean(form.formState.errors.phone)}
+                {...form.register('phone')}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Sending…' : 'Send OTP'}
-              </Button>
-            </form>
-          ) : (
-            <form className="space-y-4" onSubmit={verifyOtp}>
-              <p className="text-sm text-muted-foreground">{message}</p>
+              {form.formState.errors.phone ? (
+                <p className="text-sm text-destructive">{form.formState.errors.phone.message}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="referralCode">Referral code (optional)</Label>
               <Input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="6-digit OTP"
-                value={otp}
-                maxLength={6}
-                onChange={(event) => setOtp(event.target.value)}
-                required
+                id="referralCode"
+                placeholder="RAP-ABCD2345"
+                className="uppercase"
+                aria-invalid={Boolean(form.formState.errors.referralCode)}
+                {...form.register('referralCode')}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Verifying…' : 'Verify and continue'}
-              </Button>
-            </form>
-          )}
-          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+              {form.formState.errors.referralCode ? (
+                <p className="text-sm text-destructive">{form.formState.errors.referralCode.message}</p>
+              ) : null}
+            </div>
+            {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+            <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Sending…' : 'Send OTP'}
+            </Button>
+          </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            <Link className="underline-offset-4 hover:underline" href="/">
+              Back to home
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
+      <LoginForm />
+    </Suspense>
   );
 }

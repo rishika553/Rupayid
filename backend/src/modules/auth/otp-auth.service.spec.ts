@@ -31,12 +31,15 @@ function createPrismaStore() {
 
   const prisma = {
     user: {
-      findUnique: async ({ where }: { where: { id?: string; phoneNumber?: string } }) => {
+      findUnique: async ({ where }: { where: { id?: string; phoneNumber?: string; referralCode?: string } }) => {
         if (where.id) {
           return users.find((u) => u.id === where.id) || null;
         }
         if (where.phoneNumber) {
           return users.find((u) => u.phoneNumber === where.phoneNumber) || null;
+        }
+        if (where.referralCode) {
+          return users.find((u) => u.referralCode === where.referralCode) || null;
         }
         return null;
       },
@@ -196,6 +199,10 @@ function createService(overrides?: {
   const sms = { sendOtp: jest.fn().mockResolvedValue({ providerMessageId: 'mock-1' }) };
   const generator = { generate: () => OTP };
 
+  const referrals = {
+    provisionForUser: jest.fn(async () => null),
+    applyAtFirstVerification: jest.fn(async () => null),
+  };
   const service = new OtpAuthService(
     store.prisma as never,
     jwt,
@@ -203,15 +210,16 @@ function createService(overrides?: {
     generator as never,
     rateLimit as never,
     sms as never,
+    referrals as never,
   );
 
-  return { service, store, sms, rateLimit };
+  return { service, store, sms, rateLimit, referrals };
 }
 
 describe('OtpAuthService', () => {
   describe('valid OTP', () => {
     it('issues session tokens and marks OTP used', async () => {
-      const { service, store, sms } = createService();
+      const { service, store, sms, referrals } = createService();
       const requested = await service.requestOtp(PHONE, '1.1.1.1');
       expect(sms.sendOtp).toHaveBeenCalledWith({ to: PHONE, otp: OTP });
       expect(sms.sendOtp.mock.calls[0][0]).not.toHaveProperty('otpLogged');
@@ -221,6 +229,10 @@ describe('OtpAuthService', () => {
       expect(result.accessToken).toBeTruthy();
       expect(result.refreshToken).toBeTruthy();
       expect(result.user.phoneVerified).toBe(true);
+      expect(referrals.provisionForUser).toHaveBeenCalled();
+      expect(referrals.applyAtFirstVerification).toHaveBeenCalledWith(
+        expect.objectContaining({ firstVerification: true, refereeId: store.users[0].id }),
+      );
       expect(store.otpRequests[0].status).toBe('USED');
       expect(store.sessions).toHaveLength(2);
     });
