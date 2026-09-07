@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { EligibilityService } from './eligibility.service';
-import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { EvaluateEligibilityDto } from './dto/evaluate-eligibility.dto';
+import { EligibilityService } from './eligibility.service';
 
 @ApiTags('eligibility')
 @Controller('eligibility')
@@ -33,12 +34,12 @@ export class EligibilityController {
   }
 
   @Post('evaluate')
-  @ApiOperation({ summary: 'Evaluate user eligibility' })
+  @ApiOperation({ summary: 'Evaluate the authenticated customer against a loan product' })
   async evaluate(
     @CurrentUser() user: CurrentUserPayload,
-    @Body() data: { loanProductId?: string },
+    @Body() dto: EvaluateEligibilityDto,
   ) {
-    return this.eligibilityService.evaluate(user.id, data.loanProductId);
+    return this.eligibilityService.evaluate(user.id, dto.loanProductId);
   }
 
   @Get('evaluations/my')

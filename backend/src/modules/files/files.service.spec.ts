@@ -25,6 +25,17 @@ describe('FilesService', () => {
     expect(key.includes('http')).toBe(false);
   });
 
+  it('uses signed local storage URLs outside production when R2 is absent', async () => {
+    const upload = await service().getSignedUploadUrl({
+      userId: 'user-1',
+      applicationId: 'kyc-1',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 100,
+    });
+    expect(upload.uploadUrl).toContain('/api/v1/files/dev-upload?token=');
+    expect(upload.objectKey).toMatch(/^kyc\/user-1\/kyc-1\/.+\.jpg$/);
+  });
+
   it('rejects path-traversal segments in object keys', () => {
     expect(() => service().buildObjectKey('../other', 'kyc-1', 'application/pdf')).toThrow(
       BadRequestException,
@@ -32,5 +43,8 @@ describe('FilesService', () => {
     expect(service().keyBelongsToUser('kyc/user-1/../user-2/file.pdf', 'user-1')).toBe(false);
     expect(service().keyBelongsToUser('kyc/user-2/kyc-1/file.pdf', 'user-1')).toBe(false);
     expect(service().keyBelongsToUser('kyc/user-1/kyc-1/file.pdf', 'user-1')).toBe(true);
+    expect(service().keyBelongsToUser('https://cdn.example/kyc/user-1/kyc-1/file.pdf', 'user-1')).toBe(
+      false,
+    );
   });
 });

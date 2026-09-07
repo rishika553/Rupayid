@@ -6,24 +6,43 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const PUBLIC_PATHS = ['/', '/login', '/verify-otp'];
+const CUSTOMER_PATHS = [
+  '/dashboard',
+  '/loans',
+  '/repayments',
+  '/payments',
+  '/kyc',
+  '/referral',
+  '/notifications',
+  '/profile',
+];
 
 export function RouteGuard({ children }: { children: ReactNode }) {
-  const { isReady, isAuthenticated } = useAuth();
+  const { isReady, isAuthenticated, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isAdminRoute = matchesRoute(pathname, '/admin');
+  const isCustomerRoute = CUSTOMER_PATHS.some((route) => matchesRoute(pathname, route));
+  const isAdmin = user?.roles?.some(({ role }) => role.name === 'ADMIN') ?? false;
+  const redirectTarget =
+    !isReady
+      ? null
+      : !isAuthenticated && !isPublic
+        ? '/login'
+        : isAuthenticated && isAdmin && (isCustomerRoute || pathname === '/login' || pathname === '/verify-otp')
+          ? '/admin'
+          : isAuthenticated && !isAdmin && isAdminRoute
+            ? '/dashboard'
+            : isAuthenticated && !isAdmin && (pathname === '/login' || pathname === '/verify-otp')
+              ? '/dashboard'
+              : null;
 
   useEffect(() => {
-    if (!isReady) {
-      return;
+    if (redirectTarget) {
+      router.replace(redirectTarget);
     }
-    if (!isPublic && !isAuthenticated) {
-      router.replace('/login');
-    }
-    if (isAuthenticated && (pathname === '/login' || pathname === '/verify-otp')) {
-      router.replace('/dashboard');
-    }
-  }, [isReady, isAuthenticated, isPublic, pathname, router]);
+  }, [redirectTarget, router]);
 
   if (!isReady) {
     return (
@@ -35,13 +54,17 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isPublic && !isAuthenticated) {
+  if (redirectTarget) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-sm text-muted-foreground">
-        Redirecting to sign in…
+        Redirecting…
       </div>
     );
   }
 
   return <>{children}</>;
+}
+
+function matchesRoute(pathname: string, route: string) {
+  return pathname === route || pathname.startsWith(`${route}/`);
 }

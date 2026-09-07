@@ -5,8 +5,8 @@ import { Public } from '../../common/decorators/public.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
-import type { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
-import type { RequestOtpDto, VerifyOtpDto, RefreshSessionDto } from './dto/otp-auth.dto';
+import { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
+import { RequestOtpDto, VerifyOtpDto, RefreshSessionDto } from './dto/otp-auth.dto';
 import { OtpAuthService } from './otp-auth.service';
 
 @ApiTags('auth')

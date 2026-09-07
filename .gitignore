@@ -39,6 +39,7 @@ yarn-error.log*
 coverage/
 .nyc_output/
 playwright-report/
+backend/.local-uploads/
 
 # Turbo
 .turbo/

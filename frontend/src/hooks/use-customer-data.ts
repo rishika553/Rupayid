@@ -1,62 +1,109 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, requireApi } from '@/lib/api-client';
 import type {
+  CustomerLoan,
+  CustomerDashboard,
   CustomerProfile,
+  EligibilityResult,
   KycApplication,
   KycStatus,
   LoanApplication,
   LoanProduct,
-  NotificationRecord,
   PaginatedNotifications,
   PaymentRecord,
   ReferralMe,
-  RepaymentScheduleItem,
+  CustomerRepaymentSchedule,
 } from '@/lib/types';
-import { MOCK_PRODUCTS } from '@/lib/types';
 import { putFileWithProgress } from '@/lib/kyc';
 
-async function withFallback<T>(loader: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await loader();
-  } catch {
-    return fallback;
-  }
+export function useCustomerDashboard() {
+  return useQuery({
+    queryKey: ['dashboard', 'customer'],
+    queryFn: () => requireApi(apiClient.get<CustomerDashboard>('/dashboard')),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  });
 }
 
 export function useLoanProducts() {
   return useQuery({
     queryKey: ['loan-products'],
-    queryFn: () =>
-      withFallback(
-        () => requireApi(apiClient.get<LoanProduct[]>('/loan-products')),
-        MOCK_PRODUCTS,
-      ),
+    queryFn: () => requireApi(apiClient.get<LoanProduct[]>('/loan-products')),
+  });
+}
+
+export function useLoanProduct(id: string) {
+  return useQuery({
+    queryKey: ['loan-products', id],
+    enabled: Boolean(id),
+    queryFn: () => requireApi(apiClient.get<LoanProduct>(`/loan-products/${id}`)),
   });
 }
 
 export function useMyLoans() {
   return useQuery({
     queryKey: ['loans', 'my'],
-    queryFn: () =>
-      withFallback(() => requireApi(apiClient.get<LoanApplication[]>('/loans/applications/my')), []),
+    queryFn: () => requireApi(apiClient.get<LoanApplication[]>('/loans/applications')),
   });
 }
 
 export function useLoan(id: string) {
   return useQuery({
-    queryKey: ['loans', id],
+    queryKey: ['loans', 'track', id],
     enabled: Boolean(id),
-    queryFn: () => requireApi(apiClient.get<LoanApplication>(`/loans/applications/${id}`)),
+    queryFn: () => requireApi(apiClient.get<CustomerLoan>(`/loans/${id}`)),
   });
 }
 
-export function useApplyLoan() {
+export function useMyTrackedLoans() {
+  return useQuery({
+    queryKey: ['loans', 'track', 'me'],
+    queryFn: () => requireApi(apiClient.get<CustomerLoan[]>('/loans/me')),
+  });
+}
+
+export function useEvaluateEligibility() {
+  return useMutation({
+    mutationFn: (loanProductId: string) =>
+      requireApi(apiClient.post<EligibilityResult>('/eligibility/evaluate', { loanProductId })),
+  });
+}
+
+export function useSaveLoanDraft() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { loanProductId: string; amountRequested: number; tenureMonths: number }) =>
       requireApi(apiClient.post<LoanApplication>('/loans/applications', body)),
-    onSuccess: () => {
+    onSuccess: (draft) => {
       void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.setQueryData(['loans', draft.id], draft);
+    },
+  });
+}
+
+export function useUpdateLoanDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; amountRequested: number; tenureMonths: number; loanProductId?: string }) =>
+      requireApi(apiClient.patch<LoanApplication>(`/loans/applications/${input.id}`, {
+        amountRequested: input.amountRequested,
+        tenureMonths: input.tenureMonths,
+        loanProductId: input.loanProductId,
+      })),
+    onSuccess: (draft) => {
+      void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.setQueryData(['loans', draft.id], draft);
+    },
+  });
+}
+
+export function useSubmitLoanApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => requireApi(apiClient.post<LoanApplication>(`/loans/applications/${id}/submit`)),
+    onSuccess: (loan) => {
+      void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.setQueryData(['loans', loan.id], loan);
     },
   });
 }
@@ -165,54 +212,53 @@ export function useKycDocumentPreview() {
   });
 }
 
-export function useSchedule(loanId?: string) {
+export function useLoanRepaymentSchedule(loanId?: string) {
   return useQuery({
-    queryKey: ['repayments', 'schedule', loanId],
+    queryKey: ['loans', 'repayment-schedule', loanId],
     enabled: Boolean(loanId),
-    queryFn: () =>
-      withFallback(
-        () => requireApi(apiClient.get<RepaymentScheduleItem[]>(`/repayments/schedule/${loanId}`)),
-        [],
-      ),
+    queryFn: () => requireApi(apiClient.get<CustomerRepaymentSchedule>(`/loans/${loanId}/repayment-schedule`)),
   });
+}
+
+export function useSchedule(loanId?: string) {
+  return useLoanRepaymentSchedule(loanId);
 }
 
 export function useMyPayments() {
   return useQuery({
-    queryKey: ['payments', 'my'],
-    queryFn: () => withFallback(() => requireApi(apiClient.get<PaymentRecord[]>('/payments/my')), []),
+    queryKey: ['payments', 'me'],
+    queryFn: () => requireApi(apiClient.get<PaymentRecord[]>('/payments/me')),
   });
 }
 
-export function useCreatePayment() {
+export function usePayment(id?: string) {
+  return useQuery({
+    queryKey: ['payments', id],
+    enabled: Boolean(id),
+    queryFn: () => requireApi(apiClient.get<PaymentRecord>(`/payments/${id}`)),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ['INITIATED', 'PENDING', 'PROCESSING', 'AWAITING_CONFIRMATION'].includes(status) ? 2000 : false;
+    },
+  });
+}
+
+export function useCreateRepaymentPayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      loanApplicationId?: string;
-      method: string;
-      type: string;
-      direction: string;
-      amount: number;
-    }) => requireApi(apiClient.post<PaymentRecord>('/payments', body)),
-    onSuccess: () => {
+    mutationFn: (body: { loanId: string; installmentNumber: number; idempotencyKey?: string }) =>
+      requireApi(apiClient.post<PaymentRecord>('/payments/create', body)),
+    onSuccess: (payment) => {
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.setQueryData(['payments', payment.id], payment);
     },
   });
 }
 
 export function useMyNotifications() {
   return useQuery({
-    queryKey: ['notifications', 'my'],
-    queryFn: async () => {
-      const payload = await withFallback(
-        () => requireApi(apiClient.get<PaginatedNotifications | NotificationRecord[]>('/notifications/my')),
-        { data: [], total: 0, page: 1, limit: 20, totalPages: 0 } satisfies PaginatedNotifications,
-      );
-      if (Array.isArray(payload)) {
-        return payload;
-      }
-      return payload.data;
-    },
+    queryKey: ['notifications', 'me'],
+    queryFn: () => requireApi(apiClient.get<PaginatedNotifications>('/notifications')),
   });
 }
 
@@ -226,20 +272,20 @@ export function useMarkNotificationRead() {
   });
 }
 
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => requireApi(apiClient.post<{ updated: number }>('/notifications/read-all')),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 export function useMyReferral() {
   return useQuery({
     queryKey: ['referrals', 'me'],
-    queryFn: () =>
-      withFallback(
-        () => requireApi(apiClient.get<ReferralMe>('/referrals/me')),
-        {
-          code: null,
-          codeCreatedAt: null,
-          referredBy: null,
-          referredCount: 0,
-          referred: [],
-        } satisfies ReferralMe,
-      ),
+    queryFn: () => requireApi(apiClient.get<ReferralMe>('/referrals/me')),
   });
 }
 

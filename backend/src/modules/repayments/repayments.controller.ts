@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { RepaymentsService } from './repayments.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 
@@ -11,8 +13,11 @@ export class RepaymentsController {
 
   @Get('schedule/:loanApplicationId')
   @ApiOperation({ summary: 'Get repayment schedule for loan' })
-  async getSchedule(@Param('loanApplicationId') loanApplicationId: string) {
-    return this.repaymentsService.getSchedule(loanApplicationId);
+  async getSchedule(
+    @Param('loanApplicationId') loanApplicationId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.repaymentsService.getSchedule(loanApplicationId, user.id);
   }
 
   @Get('overdue')

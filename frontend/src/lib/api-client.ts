@@ -1,7 +1,14 @@
 import type { ApiResponse, AuthTokens } from '@rupayaid/types';
-import { clearAuth, readAuth } from '@/lib/auth-storage';
+import { clearAuth, readAuth, writeAuth } from '@/lib/auth-storage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const SKIP_BEARER = new Set([
+  '/auth/request-otp',
+  '/auth/verify-otp',
+  '/auth/refresh',
+  '/auth/login',
+  '/auth/register',
+]);
 
 function errorMessage(payload: unknown): string {
   if (!payload || typeof payload !== 'object') {
@@ -24,11 +31,13 @@ interface RequestOptions extends Omit<RequestInit, 'method' | 'body'> {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   params?: Record<string, string>;
   body?: unknown;
+  skipAuthRefresh?: boolean;
 }
 
 class ApiClient {
   private baseUrl: string;
   private tokens: AuthTokens | null = null;
+  private refreshInFlight: Promise<boolean> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -42,8 +51,45 @@ class ApiClient {
     return this.tokens || readAuth();
   }
 
+  private shouldSendBearer(endpoint: string) {
+    return !SKIP_BEARER.has(endpoint);
+  }
+
+  private async refreshSession(): Promise<boolean> {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+    this.refreshInFlight = (async () => {
+      const current = this.resolveTokens();
+      if (!current?.refreshToken) {
+        return false;
+      }
+      const response = await this.request<{ accessToken: string; refreshToken: string }>(
+        '/auth/refresh',
+        {
+          method: 'POST',
+          body: { refreshToken: current.refreshToken },
+          skipAuthRefresh: true,
+        },
+      );
+      if (!response.success || !response.data?.accessToken || !response.data?.refreshToken) {
+        return false;
+      }
+      const next = {
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+      };
+      writeAuth(next);
+      this.setTokens(next);
+      return true;
+    })().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
-    const { method = 'GET', params, body, headers: customHeaders, ...rest } = options;
+    const { method = 'GET', params, body, headers: customHeaders, skipAuthRefresh, ...rest } = options;
 
     let url = `${this.baseUrl}${endpoint}`;
     if (params) {
@@ -56,7 +102,7 @@ class ApiClient {
     };
 
     const tokens = this.resolveTokens();
-    if (tokens?.accessToken) {
+    if (tokens?.accessToken && this.shouldSendBearer(endpoint)) {
       headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
 
@@ -70,7 +116,11 @@ class ApiClient {
 
       const payload = await response.json().catch(() => ({}));
 
-      if (response.status === 401) {
+      if (response.status === 401 && !skipAuthRefresh && this.shouldSendBearer(endpoint)) {
+        const refreshed = await this.refreshSession();
+        if (refreshed) {
+          return this.request<T>(endpoint, { ...options, skipAuthRefresh: true });
+        }
         clearAuth();
         this.tokens = null;
       }

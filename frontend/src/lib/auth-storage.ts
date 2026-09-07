@@ -10,37 +10,53 @@ export interface PendingOtp {
   phone: string;
   otpRequestId: string;
   expiresAt: string;
+  cooldownUntil?: string;
   referralCode?: string;
+  developmentOtp?: string;
 }
 
-export function readAuth(): StoredAuth | null {
+function browserStorage(kind: 'localStorage' | 'sessionStorage'): Storage | null {
   if (typeof window === 'undefined') {
     return null;
   }
-  const raw = sessionStorage.getItem(TOKEN_KEY);
+  try {
+    return window[kind];
+  } catch {
+    return null;
+  }
+}
+
+export function readAuth(): StoredAuth | null {
+  const local = browserStorage('localStorage');
+  const session = browserStorage('sessionStorage');
+  const raw = local?.getItem(TOKEN_KEY) || session?.getItem(TOKEN_KEY);
   if (!raw) {
     return null;
   }
   try {
-    return JSON.parse(raw) as StoredAuth;
+    const parsed = JSON.parse(raw) as StoredAuth;
+    if (!parsed?.accessToken || !parsed?.refreshToken) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export function writeAuth(tokens: StoredAuth): void {
-  sessionStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+  const payload = JSON.stringify(tokens);
+  browserStorage('localStorage')?.setItem(TOKEN_KEY, payload);
+  browserStorage('sessionStorage')?.removeItem(TOKEN_KEY);
 }
 
 export function clearAuth(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+  browserStorage('localStorage')?.removeItem(TOKEN_KEY);
+  browserStorage('sessionStorage')?.removeItem(TOKEN_KEY);
 }
 
 export function readPendingOtp(): PendingOtp | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const raw = sessionStorage.getItem(PENDING_OTP_KEY);
+  const raw = browserStorage('sessionStorage')?.getItem(PENDING_OTP_KEY);
   if (!raw) {
     return null;
   }
@@ -52,10 +68,9 @@ export function readPendingOtp(): PendingOtp | null {
 }
 
 export function writePendingOtp(pending: PendingOtp): void {
-  sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify(pending));
+  browserStorage('sessionStorage')?.setItem(PENDING_OTP_KEY, JSON.stringify(pending));
 }
 
 export function clearPendingOtp(): void {
-  sessionStorage.removeItem(PENDING_OTP_KEY);
+  browserStorage('sessionStorage')?.removeItem(PENDING_OTP_KEY);
 }
-

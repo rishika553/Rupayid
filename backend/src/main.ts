@@ -10,6 +10,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log'],
+    rawBody: true,
   });
 
   app.getHttpAdapter().getInstance().set('trust proxy', 1);

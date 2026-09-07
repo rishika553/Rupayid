@@ -66,6 +66,14 @@ describe('ReferralsService', () => {
     });
   });
 
+  it('rejects a caller validating their own code', async () => {
+    const { svc } = service();
+    await expect(svc.validateCode('RAP-ABCD2345', '1.1.1.1', 'referrer-1')).resolves.toEqual({
+      valid: false,
+      reason: 'self',
+    });
+  });
+
   it('accepts another customer code', async () => {
     const { svc } = service();
     await expect(svc.validateCode('rap-abcd2345', '1.1.1.1')).resolves.toEqual({ valid: true });

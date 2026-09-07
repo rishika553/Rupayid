@@ -5,12 +5,22 @@ import Redis from 'ioredis';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
+export function hasUsableRedisUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname !== 'host' && !hostname.startsWith('your-');
+  } catch {
+    return false;
+  }
+}
+
 const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   useFactory: (configService: ConfigService) => {
     const url = configService.get<string>('REDIS_URL');
 
-    if (!url) {
+    if (!hasUsableRedisUrl(url)) {
       // Return a mock that never errors when called but skips real ops
       return {
         get: async () => null,
@@ -26,7 +36,7 @@ const redisProvider: Provider = {
       } as unknown as Redis;
     }
 
-    const client = new Redis(url, {
+    const client = new Redis(url!, {
       maxRetriesPerRequest: 3,
       retryStrategy(times: number) {
         if (times > 3) return null;

@@ -54,17 +54,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestOtp = useCallback(async (phone: string, referralCode?: string) => {
     const data = await requireApi(
-      apiClient.post<{ otpRequestId: string; expiresAt: string; message: string }>('/auth/request-otp', {
-        phone,
-      }),
+      apiClient.post<{
+        otpRequestId: string;
+        expiresAt: string;
+        cooldownSeconds?: number;
+        message: string;
+        developmentOtp?: string;
+      }>('/auth/request-otp', { phone }),
     );
+    const cooldownUntil = data.cooldownSeconds
+      ? new Date(Date.now() + data.cooldownSeconds * 1000).toISOString()
+      : undefined;
     writePendingOtp({
       phone,
       otpRequestId: data.otpRequestId,
       expiresAt: data.expiresAt,
+      cooldownUntil,
       referralCode: referralCode?.trim() ? referralCode.trim().toUpperCase() : undefined,
+      developmentOtp: data.developmentOtp,
     });
-    toast({ title: 'OTP sent', description: 'Enter the 6-digit code to continue.' });
+    toast({
+      title: data.developmentOtp ? 'Development OTP ready' : 'OTP sent',
+      description: data.developmentOtp
+        ? `No SMS was sent. Use ${data.developmentOtp} to continue.`
+        : 'Enter the 6-digit code to continue.',
+    });
   }, [toast]);
 
   const verifyOtp = useCallback(
@@ -119,3 +133,4 @@ export function useAuth() {
   }
   return ctx;
 }
+

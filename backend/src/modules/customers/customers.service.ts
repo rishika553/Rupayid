@@ -65,6 +65,10 @@ export class CustomersService {
             submittedAt: true,
             reviewedAt: true,
             details: true,
+            decisions: {
+              select: { decision: true, reason: true },
+              orderBy: { createdAt: 'asc' },
+            },
           },
         },
       },
@@ -267,6 +271,7 @@ export class CustomersService {
       submittedAt: Date | null;
       reviewedAt: Date | null;
       details: KycDetailsRow | null;
+      decisions?: Array<{ decision: string; reason: string | null }>;
     }>;
   }) {
     const kyc = user.kycApplications[0];
@@ -321,8 +326,22 @@ export class CustomersService {
         submittedAt: kyc?.submittedAt || null,
         reviewedAt: kyc?.reviewedAt || null,
         referenceCode: kyc?.referenceCode || null,
+        reason: this.latestReviewReason(kyc?.decisions),
       },
     };
+  }
+
+  private latestReviewReason(decisions?: Array<{ decision: string; reason: string | null }>) {
+    if (!decisions?.length) {
+      return null;
+    }
+    for (let i = decisions.length - 1; i >= 0; i -= 1) {
+      const item = decisions[i];
+      if (item.reason && ['REJECTED', 'REQUESTED_MORE_INFO'].includes(item.decision)) {
+        return item.reason;
+      }
+    }
+    return null;
   }
 
   private diffFields(

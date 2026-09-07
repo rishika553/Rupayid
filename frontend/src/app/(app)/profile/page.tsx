@@ -34,7 +34,22 @@ const schema = z.object({
   firstName: z.string().trim().min(1, 'Required').max(80),
   lastName: z.string().trim().min(1, 'Required').max(80),
   middleName: optionalText(80),
-  dateOfBirth: optionalText(10),
+  dateOfBirth: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .refine((value) => {
+      if (!value) {
+        return true;
+      }
+      const date = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(date.getTime())) {
+        return false;
+      }
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 18);
+      return date <= cutoff;
+    }, 'You must be at least 18 years old'),
   gender: optionalText(32),
   fatherOrSpouseName: optionalText(120),
   maritalStatus: optionalText(32),
@@ -363,6 +378,11 @@ export default function ProfilePage() {
             {profile.kyc.referenceCode ? <p>Reference: {profile.kyc.referenceCode}</p> : null}
             <p>Submitted: {formatDate(profile.kyc.submittedAt)}</p>
             <p>Reviewed: {formatDate(profile.kyc.reviewedAt)}</p>
+            {profile.kyc.reason && ['REJECTED', 'RESUBMISSION_REQUIRED'].includes(profile.kyc.status) ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
+                {profile.kyc.reason}
+              </p>
+            ) : null}
             <Button asChild variant="outline">
               <Link href={profile.kyc.canEdit ? '/kyc' : '/kyc/status'}>
                 {profile.kyc.status === 'NOT_STARTED' ? 'Start KYC' : profile.kyc.canEdit ? 'Continue KYC' : 'View KYC status'}

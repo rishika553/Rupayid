@@ -29,6 +29,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { FilesModule } from './modules/files/files.module';
 import { HealthModule } from './modules/health/health.module';
 import { SystemConfigModule } from './modules/config/config.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -70,6 +71,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     FilesModule,
     HealthModule,
     SystemConfigModule,
+    DashboardModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

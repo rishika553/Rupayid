@@ -11,12 +11,14 @@ import { SmsModule } from './sms/sms.module';
 import { OtpAuthService } from './otp-auth.service';
 import { OtpGenerator } from './otp-generator';
 import { OtpRateLimitService } from './otp-rate-limit.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     UserModule,
     ReferralsModule,
     SmsModule,
+    NotificationsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

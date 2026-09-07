@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -20,6 +21,8 @@ import {
   GENERIC_OTP_INVALID,
   GENERIC_OTP_SENT,
   OTP_CONFIG,
+  OTP_EXPIRED,
+  OTP_LOCKED,
 } from './otp.constants';
 import { OtpGenerator } from './otp-generator';
 import { OtpRateLimitService } from './otp-rate-limit.service';
@@ -27,6 +30,7 @@ import { maskPhone, normalizeIndianMobile } from './phone.util';
 import { SMS_PROVIDER } from './sms/sms-provider';
 import type { SmsProvider } from './sms/sms-provider';
 import { ReferralsService } from '../referrals/referrals.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const SELECT_USER = {
   id: true,
@@ -37,6 +41,13 @@ const SELECT_USER = {
   lastName: true,
   status: true,
   createdAt: true,
+  roles: {
+    select: {
+      role: {
+        select: { name: true },
+      },
+    },
+  },
 } as const;
 
 @Injectable()
@@ -51,6 +62,7 @@ export class OtpAuthService {
     private readonly rateLimit: OtpRateLimitService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly referrals: ReferralsService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   async requestOtp(rawPhone: string, ip: string, userAgent?: string) {
@@ -109,23 +121,49 @@ export class OtpAuthService {
       },
     });
 
-    try {
-      await this.sms.sendOtp({ to: phone, otp });
-    } catch {
-      await this.prisma.otpRequest.update({
-        where: { id: row.id },
-        data: { status: 'CANCELLED' },
-      });
-      throw new ServiceUnavailableException('Unable to send OTP. Try again later.');
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    if (isProduction) {
+      try {
+        if (this.notifications) {
+          await this.notifications.publish({
+            eventType: 'OTP',
+            userId: user.id,
+            referenceId: row.id,
+            dedupeKey: `otp:${row.id}`,
+            destination: phone,
+            variables: { otp },
+          });
+        } else {
+          await this.sms.sendOtp({ to: phone, otp });
+        }
+      } catch {
+        await this.prisma.otpRequest.update({
+          where: { id: row.id },
+          data: { status: 'CANCELLED' },
+        });
+        throw new ServiceUnavailableException('Unable to send OTP. Try again later.');
+      }
+    } else {
+      try {
+        await this.sms.sendOtp({ to: phone, otp });
+      } catch (error) {
+        this.logger.warn(
+          `Mock OTP SMS failed for ${maskPhone(phone)}; development login can continue with the on-screen code`,
+        );
+        this.logger.debug(error instanceof Error ? error.message : String(error));
+      }
+      this.logger.log(
+        `OTP request ${row.id} created for ${maskPhone(phone)}; use the development code on screen`,
+      );
     }
-
-    this.logger.log(`OTP request ${row.id} created for ${maskPhone(phone)}`);
 
     return {
       otpRequestId: row.id,
       expiresAt: expiresAt.toISOString(),
       cooldownSeconds: Math.floor(OTP_CONFIG.resendCooldownMs / 1000),
       message: GENERIC_OTP_SENT,
+      developmentOtp:
+        this.configService.get<string>('NODE_ENV') === 'production' ? undefined : otp,
     };
   }
 
@@ -172,7 +210,7 @@ export class OtpAuthService {
         where: { id: request.id },
         data: { status: 'EXPIRED' },
       });
-      throw new UnauthorizedException(GENERIC_OTP_INVALID);
+      throw new UnauthorizedException(OTP_EXPIRED);
     }
 
     if (request.attempts >= request.maxAttempts) {
@@ -180,7 +218,7 @@ export class OtpAuthService {
         where: { id: request.id },
         data: { status: 'LOCKED' },
       });
-      throw new UnauthorizedException(GENERIC_OTP_INVALID);
+      throw new UnauthorizedException(OTP_LOCKED);
     }
 
     const expected = hashOtp(this.otpPepper(), phone, otp);
@@ -196,7 +234,7 @@ export class OtpAuthService {
           status: locked ? 'LOCKED' : 'ACTIVE',
         },
       });
-      throw new UnauthorizedException(GENERIC_OTP_INVALID);
+      throw new UnauthorizedException(locked ? OTP_LOCKED : GENERIC_OTP_INVALID);
     }
 
     const firstVerification = !user.phoneVerified;
@@ -440,6 +478,7 @@ export class OtpAuthService {
       expiresAt: new Date(Date.now() + OTP_CONFIG.expiryMs).toISOString(),
       cooldownSeconds: Math.floor(OTP_CONFIG.resendCooldownMs / 1000),
       message: GENERIC_OTP_SENT,
+      developmentOtp: undefined,
     };
   }
 

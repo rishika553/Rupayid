@@ -20,9 +20,12 @@
 | `JWT_EXPIRES_IN` | No | Access token expiry |
 | `REFRESH_TOKEN_SECRET` | Yes | Refresh token secret |
 | `OTP_PEPPER` | Yes | HMAC pepper for hashing OTPs |
-| `MSG91_AUTH_KEY` | Production | MSG91 auth key (mock SMS if unset) |
-| `MSG91_TEMPLATE_ID` | Production | MSG91 OTP template id |
-| `MSG91_SENDER_ID` | No | MSG91 sender id |
+| `DIGIMILES_USERNAME` | Production | Digimiles SMS username (mock SMS if unset) |
+| `DIGIMILES_PASSWORD` | Production | Digimiles SMS password |
+| `DIGIMILES_BASE_URL` | No | Digimiles send URL |
+| `DIGIMILES_SENDER_ID` | Production | 6-letter DLT header |
+| `DIGIMILES_ENTITY_ID` | Production | 19-digit DLT Principal Entity ID |
+| `DIGIMILES_TEMPLATE_OTP` | Production | DLT template ID for OTP SMS |
 | `REDIS_URL` | Yes | Redis connection string (Upstash) |
 | `R2_ACCOUNT_ID` | Yes | Cloudflare R2 account ID |
 | `R2_ACCESS_KEY_ID` | Yes | R2 access key |

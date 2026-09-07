@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { LoansService } from './loans.service';
-import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import type { PaginationDto} from '../../common/decorators/api-paginated.decorator';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.decorator';
+import type { PaginationDto } from '../../common/decorators/api-paginated.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import {
+  CreateLoanApplicationDto,
+  SubmitLoanApplicationDto,
+  UpdateLoanApplicationDto,
+} from './dto/loan-application.dto';
+import { LoansService } from './loans.service';
 
 @ApiTags('loans')
 @Controller('loans')
@@ -14,21 +20,26 @@ export class LoansController {
   constructor(private readonly loansService: LoansService) {}
 
   @Post('applications')
-  @ApiOperation({ summary: 'Submit loan application' })
+  @ApiOperation({ summary: 'Create a customer loan application draft' })
   async createApplication(
     @CurrentUser() user: CurrentUserPayload,
-    @Body() data: { loanProductId: string; amountRequested: number; tenureMonths: number },
+    @Body() data: CreateLoanApplicationDto,
+    @Req() req: Request,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.loansService.createApplication(user.id, data);
+    return this.loansService.createApplication(user.id, data, {
+      ip: clientIp(req),
+      idempotencyKey: idempotencyKey || data.idempotencyKey,
+    });
   }
 
   @Get('applications/my')
   @ApiOperation({ summary: 'Get my loan applications' })
   async myApplications(@CurrentUser() user: CurrentUserPayload) {
-    return this.loansService.findByUser(user.id);
+    return this.loansService.findMine(user.id);
   }
 
-  @Get('applications')
+  @Get('applications/admin')
   @Roles('ADMIN', 'UNDERWRITER')
   @ApiPaginatedResponse()
   @ApiOperation({ summary: 'List all loan applications (admin)' })
@@ -36,10 +47,60 @@ export class LoansController {
     return this.loansService.findAll(pagination.page, pagination.limit, status);
   }
 
+  @Get('applications')
+  @ApiOperation({ summary: 'List the current customer loan applications' })
+  async listMine(@CurrentUser() user: CurrentUserPayload) {
+    return this.loansService.findMine(user.id);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'List the current customer loans for tracking' })
+  async myLoans(@CurrentUser() user: CurrentUserPayload) {
+    return this.loansService.listTrackedLoans(user.id);
+  }
+
+  @Get(':id/repayment-schedule')
+  @ApiOperation({ summary: 'Get the customer repayment schedule for a loan' })
+  async repaymentSchedule(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.loansService.getRepaymentSchedule(id, user.id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a customer loan by ID' })
+  async getLoan(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.loansService.getTrackedLoan(id, user.id);
+  }
+
   @Get('applications/:id')
-  @ApiOperation({ summary: 'Get loan application by ID' })
-  async findOne(@Param('id') id: string) {
-    return this.loansService.findById(id);
+  @ApiOperation({ summary: 'Get a loan application by ID' })
+  async findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.loansService.getApplication(id, user.id);
+  }
+
+  @Patch('applications/:id')
+  @ApiOperation({ summary: 'Update a draft loan application' })
+  async update(
+    @Param('id') id: string,
+    @Body() data: UpdateLoanApplicationDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @Req() req: Request,
+  ) {
+    return this.loansService.updateApplication(id, user.id, data, clientIp(req));
+  }
+
+  @Post('applications/:id/submit')
+  @ApiOperation({ summary: 'Submit a draft loan application' })
+  async submit(
+    @Param('id') id: string,
+    @Body() data: SubmitLoanApplicationDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @Req() req: Request,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.loansService.submitApplication(id, user.id, {
+      ip: clientIp(req),
+      idempotencyKey: idempotencyKey || data.idempotencyKey,
+    });
   }
 
   @Patch('applications/:id/state')
@@ -83,4 +144,12 @@ export class LoansController {
   ) {
     return this.loansService.reject(id, { reason: data.reason, rejectedById: user.id });
   }
+}
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || 'unknown';
 }

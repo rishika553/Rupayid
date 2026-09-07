@@ -35,13 +35,18 @@ export type KycApplicationStatus = (typeof KycApplicationStatus)[keyof typeof Ky
 export const LoanApplicationStatus = {
   DRAFT: 'DRAFT',
   SUBMITTED: 'SUBMITTED',
+  ELIGIBILITY_CHECK: 'ELIGIBILITY_CHECK',
   UNDER_REVIEW: 'UNDER_REVIEW',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+  DISBURSEMENT_PENDING: 'DISBURSEMENT_PENDING',
+  DISBURSED: 'DISBURSED',
+  ACTIVE: 'ACTIVE',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED',
   WITHDRAWN: 'WITHDRAWN',
   RE_SENT: 'RE_SENT',
   EXPIRED: 'EXPIRED',
-  CANCELLED: 'CANCELLED',
 } as const;
 export type LoanApplicationStatus =
   (typeof LoanApplicationStatus)[keyof typeof LoanApplicationStatus];

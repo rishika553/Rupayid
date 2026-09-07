@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Source_Sans_3 } from 'next/font/google';
 import './globals.css';
 import { AppProviders } from '@/components/providers/app-providers';
-
-const sans = Source_Sans_3({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: 'RupayAid',
@@ -14,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={sans.className}>
+      <body>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

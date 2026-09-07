@@ -247,6 +247,7 @@ async function main() {
     {
       code: 'PL-1L-12M',
       name: 'Personal Loan 1L 12M',
+      description: 'A short-tenure personal loan for everyday needs.',
       minAmount: 50000,
       maxAmount: 200000,
       minTenureMonths: 6,
@@ -257,6 +258,7 @@ async function main() {
     {
       code: 'PL-3L-36M',
       name: 'Personal Loan 3L 36M',
+      description: 'A larger personal loan with a longer repayment period.',
       minAmount: 100000,
       maxAmount: 500000,
       minTenureMonths: 12,
@@ -267,6 +269,7 @@ async function main() {
     {
       code: 'SL-50K-6M',
       name: 'Small Loan 50K 6M',
+      description: 'A smaller personal loan for short-term expenses.',
       minAmount: 10000,
       maxAmount: 50000,
       minTenureMonths: 3,
@@ -281,11 +284,10 @@ async function main() {
       where: { code: p.code },
       create: {
         ...p,
-        rules: JSON.stringify({
+        rules: {
           maxDebtRatio: 0.4,
           minCreditScore: 650,
-          excludedCities: [],
-        }),
+        },
       },
       update: {},
     });
@@ -371,6 +373,34 @@ async function main() {
     { slug: 'loan_approved', channel: 'EMAIL' as const, titleTemplate: 'Loan Approved', bodyTemplate: 'Congratulations {{firstName}}! Your loan of ₹{{amount}} is approved.' },
     { slug: 'loan_disbursed', channel: 'EMAIL' as const, titleTemplate: 'Loan Disbursed', bodyTemplate: '₹{{amount}} disbursed to your account via {{method}}.' },
     { slug: 'emi_reminder', channel: 'SMS' as const, titleTemplate: 'EMI Reminder', bodyTemplate: 'Your EMI of ₹{{amount}} is due on {{dueDate}}.' },
+    { slug: 'repayment_received', channel: 'INAPP' as const, titleTemplate: 'Payment received', bodyTemplate: 'We recorded your repayment of ₹{{amount}}.' },
+    { slug: 'otp_sms', channel: 'SMS' as const, titleTemplate: 'Your RupayAid OTP', bodyTemplate: 'Your OTP is {{otp}}. It expires shortly.' },
+    { slug: 'kyc_submitted_inapp', channel: 'INAPP' as const, titleTemplate: 'KYC submitted', bodyTemplate: 'Your KYC application {{reference}} is under review.' },
+    { slug: 'kyc_submitted_email', channel: 'EMAIL' as const, titleTemplate: 'KYC submitted', bodyTemplate: 'Your KYC application {{reference}} is under review.' },
+    { slug: 'kyc_approved_inapp', channel: 'INAPP' as const, titleTemplate: 'KYC approved', bodyTemplate: 'Your KYC verification has been approved.' },
+    { slug: 'kyc_approved_email', channel: 'EMAIL' as const, titleTemplate: 'KYC approved', bodyTemplate: 'Your KYC verification has been approved.' },
+    { slug: 'kyc_approved_sms', channel: 'SMS' as const, titleTemplate: 'KYC approved', bodyTemplate: 'Your RupayAid KYC has been approved.' },
+    { slug: 'kyc_rejected_inapp', channel: 'INAPP' as const, titleTemplate: 'KYC needs attention', bodyTemplate: 'Your KYC was rejected. {{reason}}' },
+    { slug: 'kyc_rejected_email', channel: 'EMAIL' as const, titleTemplate: 'KYC needs attention', bodyTemplate: 'Your KYC was rejected. {{reason}}' },
+    { slug: 'kyc_rejected_sms', channel: 'SMS' as const, titleTemplate: 'KYC needs attention', bodyTemplate: 'Your RupayAid KYC needs attention. {{reason}}' },
+    { slug: 'loan_submitted_inapp', channel: 'INAPP' as const, titleTemplate: 'Loan application submitted', bodyTemplate: 'Application {{applicationNumber}} was submitted.' },
+    { slug: 'loan_submitted_email', channel: 'EMAIL' as const, titleTemplate: 'Loan application submitted', bodyTemplate: 'Application {{applicationNumber}} was submitted.' },
+    { slug: 'loan_approved_inapp', channel: 'INAPP' as const, titleTemplate: 'Loan approved', bodyTemplate: 'Application {{applicationNumber}} has been approved.' },
+    { slug: 'loan_approved_email', channel: 'EMAIL' as const, titleTemplate: 'Loan approved', bodyTemplate: 'Application {{applicationNumber}} has been approved.' },
+    { slug: 'loan_approved_sms', channel: 'SMS' as const, titleTemplate: 'Loan approved', bodyTemplate: 'Your RupayAid loan {{applicationNumber}} has been approved.' },
+    { slug: 'loan_rejected_inapp', channel: 'INAPP' as const, titleTemplate: 'Loan application update', bodyTemplate: 'Application {{applicationNumber}} was rejected. {{reason}}' },
+    { slug: 'loan_rejected_email', channel: 'EMAIL' as const, titleTemplate: 'Loan application update', bodyTemplate: 'Application {{applicationNumber}} was rejected. {{reason}}' },
+    { slug: 'disbursement_inapp', channel: 'INAPP' as const, titleTemplate: 'Loan disbursed', bodyTemplate: '₹{{amount}} has been disbursed for {{applicationNumber}}.' },
+    { slug: 'disbursement_email', channel: 'EMAIL' as const, titleTemplate: 'Loan disbursed', bodyTemplate: '₹{{amount}} has been disbursed for {{applicationNumber}}.' },
+    { slug: 'disbursement_sms', channel: 'SMS' as const, titleTemplate: 'Loan disbursed', bodyTemplate: '₹{{amount}} has been disbursed for {{applicationNumber}}.' },
+    { slug: 'repayment_due_inapp', channel: 'INAPP' as const, titleTemplate: 'Repayment due', bodyTemplate: 'Installment {{installmentNumber}} of ₹{{amount}} is due on {{dueDate}}.' },
+    { slug: 'repayment_due_email', channel: 'EMAIL' as const, titleTemplate: 'Repayment due', bodyTemplate: 'Installment {{installmentNumber}} of ₹{{amount}} is due on {{dueDate}}.' },
+    { slug: 'repayment_due_sms', channel: 'SMS' as const, titleTemplate: 'Repayment due', bodyTemplate: 'Your RupayAid installment of ₹{{amount}} is due on {{dueDate}}.' },
+    { slug: 'repayment_successful_inapp', channel: 'INAPP' as const, titleTemplate: 'Repayment successful', bodyTemplate: 'We received your repayment of ₹{{amount}}.' },
+    { slug: 'repayment_successful_email', channel: 'EMAIL' as const, titleTemplate: 'Repayment successful', bodyTemplate: 'We received your repayment of ₹{{amount}}.' },
+    { slug: 'repayment_successful_sms', channel: 'SMS' as const, titleTemplate: 'Repayment successful', bodyTemplate: 'Your RupayAid repayment of ₹{{amount}} was successful.' },
+    { slug: 'payment_failed_inapp', channel: 'INAPP' as const, titleTemplate: 'Payment failed', bodyTemplate: 'Your payment of ₹{{amount}} could not be completed.' },
+    { slug: 'payment_failed_sms', channel: 'SMS' as const, titleTemplate: 'Payment failed', bodyTemplate: 'Your RupayAid payment of ₹{{amount}} failed. Please try again.' },
   ];
 
   for (const t of templates) {
@@ -381,7 +411,7 @@ async function main() {
     });
   }
 
-  console.log('  ✓ 6 notification templates');
+  console.log('  ✓ notification templates');
 
   // ──────────────────────────────────────────────────────────────
   // 8. System Settings (non-secret)

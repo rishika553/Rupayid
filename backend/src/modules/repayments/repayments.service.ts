@@ -5,18 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class RepaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSchedule(loanApplicationId: string) {
-    const schedule = await this.prisma.repaymentSchedule.findMany({
+  async getSchedule(loanApplicationId: string, requesterId?: string) {
+    const loan = await this.prisma.loanApplication.findUnique({
+      where: { id: loanApplicationId },
+      select: { id: true, userId: true },
+    });
+    if (!loan || (requesterId && loan.userId !== requesterId)) {
+      throw new NotFoundException('Loan application not found');
+    }
+    return this.prisma.repaymentSchedule.findMany({
       where: { loanApplicationId },
       orderBy: { sequence: 'asc' },
     });
-
-    if (!schedule.length) {
-      const loan = await this.prisma.loanApplication.findUnique({ where: { id: loanApplicationId } });
-      if (!loan) throw new NotFoundException('Loan application not found');
-    }
-
-    return schedule;
   }
 
   async createRepayment(data: {

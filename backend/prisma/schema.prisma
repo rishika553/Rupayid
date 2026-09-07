@@ -176,13 +176,18 @@ enum LoanStatus {
 enum LoanApplicationStatus {
   DRAFT
   SUBMITTED
+  ELIGIBILITY_CHECK
   UNDER_REVIEW
   APPROVED
   REJECTED
+  DISBURSEMENT_PENDING
+  DISBURSED
+  ACTIVE
+  CLOSED
+  CANCELLED
   WITHDRAWN
   RE_SENT
   EXPIRED
-  CANCELLED
 }
 
 enum LoanApprovalDecision {
@@ -1007,10 +1012,11 @@ model LoanApplication {
   interestRate      Decimal               @db.Decimal(7, 4)
   processingFee     Decimal               @db.Decimal(12, 2)
   downPayment       Decimal?              @db.Decimal(12, 2)
-  status            LoanApplicationStatus @default(SUBMITTED)
-  currentState      String                @default("SUBMITTED") // mirrors status machine locator
+  status            LoanApplicationStatus @default(DRAFT)
+  currentState      String                @default("DRAFT") // mirrors status machine locator
   metadata          Json?
   ipAddress         String?
+  idempotencyKey    String?               @unique @map("idempotency_key")
   submittedAt       DateTime?
   updatedAt         DateTime              @updatedAt
   createdAt         DateTime              @default(now())
@@ -1128,6 +1134,7 @@ model RepaymentSchedule {
 
   loanApplication LoanApplication @relation(fields: [loanApplicationId], references: [id], onDelete: Cascade)
   repayments      Repayment[]
+  payments        Payment[]
 
   @@unique([loanApplicationId, sequence])
   @@index([loanApplicationId, status])
@@ -1166,6 +1173,7 @@ model Payment {
   id                String           @id @default(uuid())
   externalId        String?          @unique // payment gateway reference
   loanApplicationId String?
+  scheduleId        String?
   userId            String?
   txRef             String?          @unique // our own reference
   idempotencyKey    String?          @unique @map("idempotency_key")
@@ -1187,17 +1195,33 @@ model Payment {
   updatedAt         DateTime         @updatedAt
 
   loanApplication LoanApplication?     @relation(fields: [loanApplicationId], references: [id], onDelete: SetNull)
+  schedule        RepaymentSchedule?   @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   user            User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   transactions    PaymentTransaction[]
   repayment       Repayment[]
   disbursement    LoanDisbursement?
 
   @@index([loanApplicationId])
+  @@index([scheduleId, status])
   @@index([userId])
   @@index([status])
   @@index([capturedAt])
   @@index([gatewayRef])
   @@map("payments")
+}
+
+/// Provider webhook deliveries. Unique event id blocks duplicate settlement.
+model PaymentWebhookEvent {
+  id        String   @id @default(uuid())
+  provider  String
+  eventId   String
+  eventType String
+  paymentId String?
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([paymentId])
+  @@map("payment_webhook_events")
 }
 
 /// Fine-grained money breakdown for a payment. Immutable append-only.
@@ -1303,6 +1327,7 @@ model Notification {
   id          String              @id @default(uuid())
   userId      String?
   templateId  String?
+  dedupeKey   String?             @unique @map("dedupe_key")
   type        NotificationType
   eventType   String?             @map("event_type")
   status      NotificationStatus  @default(QUEUED)
@@ -1312,6 +1337,11 @@ model Notification {
   channel     NotificationChannel
   sentAt      DateTime?
   deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+  provider    String?
+  providerMessageId String?       @map("provider_message_id")
+  attemptCount Int                @default(0) @map("attempt_count")
   error       String? // last delivery error
   priority    String              @default("normal")
   referenceId String? // e.g. LoanApplication.id
@@ -1320,11 +1350,31 @@ model Notification {
 
   user     User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   template NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  attempts NotificationDeliveryAttempt[]
 
   @@index([userId, status])
   @@index([type, status])
   @@index([eventType])
   @@map("notifications")
+}
+
+/// Append-only provider delivery attempts for operational troubleshooting.
+model NotificationDeliveryAttempt {
+  id                String   @id @default(uuid())
+  notificationId    String
+  attemptNumber     Int
+  provider          String
+  status            String
+  providerMessageId String?  @map("provider_message_id")
+  error             String?
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, attemptNumber])
+  @@index([status, startedAt])
+  @@map("notification_delivery_attempts")
 }
 
 // ============================================================================

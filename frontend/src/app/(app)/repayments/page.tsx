@@ -1,27 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Card, CardHeader, CardTitle } from '@rupayaid/ui';
-import { Badge, statusTone } from '@/components/ui/badge';
+import { useState } from 'react';
+import { RepaymentSchedulePanel } from '@/components/loans/repayment-schedule-panel';
 import { EmptyState, ErrorState, PageHeader } from '@/components/ui/feedback';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMyLoans, useSchedule } from '@/hooks/use-customer-data';
-import { formatDate, formatInr, statusLabel } from '@/lib/format';
+import { useLoanRepaymentSchedule, useMyTrackedLoans } from '@/hooks/use-customer-data';
 
 export default function RepaymentsPage() {
-  const loansQuery = useMyLoans();
+  const loansQuery = useMyTrackedLoans();
   const loans = loansQuery.data || [];
   const [loanId, setLoanId] = useState<string>('');
   const selectedId = loanId || loans[0]?.id;
-  const scheduleQuery = useSchedule(selectedId);
-
-  const outstanding = useMemo(
-    () =>
-      (scheduleQuery.data || [])
-        .filter((row) => !['PAID', 'WAIVED', 'CANCELLED'].includes(row.status))
-        .reduce((sum, row) => sum + Math.max(0, Number(row.totalAmount) - Number(row.paidAmount)), 0),
-    [scheduleQuery.data],
-  );
+  const scheduleQuery = useLoanRepaymentSchedule(selectedId);
 
   if (loansQuery.isLoading) {
     return <Skeleton className="h-48" />;
@@ -42,7 +32,7 @@ export default function RepaymentsPage() {
 
   return (
     <div>
-      <PageHeader title="Repayments" description="EMI lines for the selected loan." />
+      <PageHeader title="Repayments" description="Next payment, amounts due, and the full EMI schedule." />
       <div className="mb-4">
         <label htmlFor="loan" className="mb-2 block text-sm font-medium">
           Loan
@@ -60,29 +50,12 @@ export default function RepaymentsPage() {
           ))}
         </select>
       </div>
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-lg">Outstanding {formatInr(outstanding)}</CardTitle>
-        </CardHeader>
-      </Card>
       {scheduleQuery.isLoading ? (
         <Skeleton className="h-40" />
-      ) : (scheduleQuery.data || []).length === 0 ? (
-        <EmptyState title="No EMIs yet" description="Operations generates the schedule after approval." />
+      ) : scheduleQuery.error || !scheduleQuery.data ? (
+        <ErrorState message="Unable to load this repayment schedule." onRetry={() => void scheduleQuery.refetch()} />
       ) : (
-        <ul className="space-y-2">
-          {(scheduleQuery.data || []).map((row) => (
-            <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-4 text-sm">
-              <span>
-                EMI {row.sequence} · {formatDate(row.dueDate)}
-              </span>
-              <span className="flex items-center gap-2">
-                {formatInr(row.totalAmount)}
-                <Badge tone={statusTone(row.status)}>{statusLabel(row.status)}</Badge>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <RepaymentSchedulePanel schedule={scheduleQuery.data} />
       )}
     </div>
   );

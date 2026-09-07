@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Matches, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -38,19 +38,92 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\d{6}$/)
+  DEV_OTP_CODE!: string;
+
+  @IsOptional()
+  @IsString()
+  API_PUBLIC_URL!: string;
+
+  @IsOptional()
+  @IsString()
+  FILE_UPLOAD_SECRET!: string;
+
+  @IsOptional()
+  @IsString()
   REFRESH_TOKEN_SECRET!: string;
 
   @IsOptional()
   @IsString()
-  MSG91_AUTH_KEY!: string;
+  DIGIMILES_USERNAME!: string;
 
   @IsOptional()
   @IsString()
-  MSG91_TEMPLATE_ID!: string;
+  DIGIMILES_PASSWORD!: string;
 
   @IsOptional()
   @IsString()
-  MSG91_SENDER_ID!: string;
+  DIGIMILES_BASE_URL!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_SENDER_ID!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_ENTITY_ID!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_OTP_MESSAGE!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_OTP!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_KYC_APPROVED!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_KYC_REJECTED!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_LOAN_APPROVED!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_DISBURSEMENT!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_REPAYMENT_DUE!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_REPAYMENT_SUCCESSFUL!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_PAYMENT_FAILED!: string;
+
+  @IsOptional()
+  @IsString()
+  DIGIMILES_TEMPLATE_DEFAULT!: string;
+
+  @IsOptional()
+  @IsString()
+  RESEND_API_KEY!: string;
+
+  @IsOptional()
+  @IsString()
+  RESEND_FROM_EMAIL!: string;
+
+  @IsOptional()
+  @IsString()
+  NOTIFICATION_PAYLOAD_SECRET!: string;
 
   @IsOptional()
   @IsString()
@@ -71,6 +144,18 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   R2_BUCKET_NAME!: string;
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_KEY_ID!: string;
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_KEY_SECRET!: string;
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_WEBHOOK_SECRET!: string;
 }
 
 export function validate(config: Record<string, unknown>) {

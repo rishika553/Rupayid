@@ -11,7 +11,7 @@ export class LoanProductsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'List active loan products' })
+  @ApiOperation({ summary: 'List active customer-available loan products' })
   async findAll() {
     return this.loanProductsService.findAll();
   }
@@ -33,9 +33,9 @@ export class LoanProductsController {
 
   @Get(':id')
   @Public()
-  @ApiOperation({ summary: 'Get loan product by ID' })
+  @ApiOperation({ summary: 'Get an active customer-available loan product' })
   async findOne(@Param('id') id: string) {
-    return this.loanProductsService.findById(id);
+    return this.loanProductsService.findCustomerById(id);
   }
 
   @Post()

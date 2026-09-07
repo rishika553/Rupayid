@@ -7,6 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { createReadStream, createWriteStream } from 'fs';
+import { mkdir, rm } from 'fs/promises';
+import { dirname, join, resolve } from 'path';
+import { Transform } from 'stream';
+import { pipeline } from 'stream/promises';
 
 export const ALLOWED_KYC_MIME_TYPES = [
   'application/pdf',
@@ -67,7 +72,14 @@ export class FilesService {
   }
 
   keyBelongsToUser(key: string, userId: string): boolean {
-    if (!key || key.includes('..') || key.includes('\\') || key.includes('//')) {
+    if (
+      !key ||
+      key.includes('..') ||
+      key.includes('\\') ||
+      key.includes('//') ||
+      key.includes(':') ||
+      key.startsWith('/')
+    ) {
       return false;
     }
     const prefix = `kyc/${userId}/`;
@@ -81,6 +93,18 @@ export class FilesService {
     fileSizeBytes: number;
   }) {
     this.assertAllowedUpload(input.mimeType, input.fileSizeBytes);
+    if (this.useLocalStorage()) {
+      const key = this.buildObjectKey(input.userId, input.applicationId, input.mimeType);
+      return {
+        objectKey: key,
+        uploadUrl: `${this.apiBaseUrl()}/files/dev-upload?token=${encodeURIComponent(
+          this.localToken(key, input.mimeType, 'upload'),
+        )}`,
+        expiresInSeconds: SIGNED_URL_TTL_SECONDS,
+        maxBytes: MAX_KYC_FILE_BYTES,
+        contentType: input.mimeType,
+      };
+    }
     this.assertReady();
     const key = this.buildObjectKey(input.userId, input.applicationId, input.mimeType);
     const uploadUrl = await this.signPut(key, input.mimeType);
@@ -94,10 +118,19 @@ export class FilesService {
   }
 
   async getSignedDownloadUrl(objectKey: string) {
+    if (this.useLocalStorage()) {
+      return {
+        downloadUrl: `${this.apiBaseUrl()}/files/dev-download?token=${encodeURIComponent(
+          this.localToken(objectKey, '', 'download'),
+        )}`,
+        expiresInSeconds: SIGNED_URL_TTL_SECONDS,
+      };
+    }
     this.assertReady();
     const command = new GetObjectCommand({
       Bucket: this.bucket(),
       Key: objectKey,
+      ResponseCacheControl: 'private, no-store',
     });
     const downloadUrl = await getSignedUrl(this.client as S3Client, command, {
       expiresIn: SIGNED_URL_TTL_SECONDS,
@@ -109,6 +142,10 @@ export class FilesService {
   }
 
   async deleteFile(key: string): Promise<void> {
+    if (this.useLocalStorage()) {
+      await rm(this.localPath(key), { force: true });
+      return;
+    }
     if (!this.client) {
       return;
     }
@@ -134,6 +171,130 @@ export class FilesService {
     if (!this.client || !this.isConfigured()) {
       throw new ServiceUnavailableException('Document storage is not configured');
     }
+  }
+
+  async saveLocalUpload(
+    token: string,
+    contentType: string,
+    input: NodeJS.ReadableStream,
+  ) {
+    if (!this.useLocalStorage()) {
+      throw new ServiceUnavailableException('Local document storage is disabled');
+    }
+    const payload = this.verifyLocalToken(token, 'upload');
+    if (payload.contentType !== contentType) {
+      throw new BadRequestException('Upload content type does not match');
+    }
+    this.assertAllowedUpload(contentType, 1);
+    const path = this.localPath(payload.key);
+    await mkdir(dirname(path), { recursive: true });
+    let bytes = 0;
+    const limit = new Transform({
+      transform(chunk, _encoding, callback) {
+        bytes += Buffer.byteLength(chunk);
+        callback(
+          bytes > MAX_KYC_FILE_BYTES ? new Error('File exceeds 5 MB') : null,
+          chunk,
+        );
+      },
+    });
+    try {
+      await pipeline(input, limit, createWriteStream(path, { flags: 'wx' }));
+    } catch (error) {
+      await rm(path, { force: true });
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Could not store document',
+      );
+    }
+    if (bytes < 1) {
+      await rm(path, { force: true });
+      throw new BadRequestException('Document is empty');
+    }
+    return { uploaded: true };
+  }
+
+  openLocalDownload(token: string) {
+    if (!this.useLocalStorage()) {
+      throw new ServiceUnavailableException('Local document storage is disabled');
+    }
+    const payload = this.verifyLocalToken(token, 'download');
+    return { stream: createReadStream(this.localPath(payload.key)), key: payload.key };
+  }
+
+  private useLocalStorage() {
+    return this.configService.get<string>('NODE_ENV') !== 'production' && !this.isConfigured();
+  }
+
+  private apiBaseUrl() {
+    const configured = this.configService.get<string>('API_PUBLIC_URL');
+    if (configured) return configured.replace(/\/$/, '');
+    const prefix = this.configService.get<string>('API_PREFIX') || 'api/v1';
+    const port = this.configService.get<string>('PORT') || '3001';
+    return `http://localhost:${port}/${prefix}`;
+  }
+
+  private localToken(key: string, contentType: string, operation: 'upload' | 'download') {
+    const encoded = Buffer.from(
+      JSON.stringify({
+        key,
+        contentType,
+        operation,
+        expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1_000,
+      }),
+    ).toString('base64url');
+    const signature = crypto
+      .createHmac('sha256', this.localSecret())
+      .update(encoded)
+      .digest('base64url');
+    return `${encoded}.${signature}`;
+  }
+
+  private verifyLocalToken(token: string, operation: 'upload' | 'download') {
+    const [encoded, signature] = token.split('.');
+    if (!encoded || !signature) throw new BadRequestException('Invalid upload token');
+    const expected = crypto
+      .createHmac('sha256', this.localSecret())
+      .update(encoded)
+      .digest('base64url');
+    const actualBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (
+      actualBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(actualBuffer, expectedBuffer)
+    ) {
+      throw new BadRequestException('Invalid upload token');
+    }
+    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as {
+      key: string;
+      contentType: string;
+      operation: string;
+      expiresAt: number;
+    };
+    if (
+      payload.operation !== operation ||
+      payload.expiresAt <= Date.now() ||
+      !this.keyBelongsToUser(payload.key, payload.key.split('/')[1] || '')
+    ) {
+      throw new BadRequestException('Invalid or expired upload token');
+    }
+    return payload;
+  }
+
+  private localPath(key: string) {
+    const root = resolve(process.cwd(), '.local-uploads');
+    const target = resolve(join(root, ...key.split('/')));
+    if (!target.startsWith(`${root}\\`) && !target.startsWith(`${root}/`)) {
+      throw new BadRequestException('Invalid storage key');
+    }
+    return target;
+  }
+
+  private localSecret() {
+    return (
+      this.configService.get<string>('FILE_UPLOAD_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'development-file-secret'
+    );
   }
 
   private accountId() {

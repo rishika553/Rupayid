@@ -3,11 +3,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ConfirmKycDocumentDto, RequestKycUploadDto, UpsertKycDetailsDto } from './dto/kyc.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const EDITABLE = ['DRAFT', 'RESUBMISSION_REQUIRED'] as const;
 const STAFF_ROLES = ['ADMIN', 'UNDERWRITER'];
@@ -28,6 +30,7 @@ export class KycService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
     private readonly audit: AuditService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   async createMine(userId: string, ip?: string, userAgent?: string) {
@@ -231,6 +234,13 @@ export class KycService {
       ipAddress: ip,
       userAgent,
     });
+    await this.notifications?.publish({
+      eventType: 'KYC_SUBMITTED',
+      userId,
+      referenceId: app.id,
+      dedupeKey: `kyc-submitted:${app.id}`,
+      variables: { reference: app.referenceCode },
+    });
 
     return this.getStatus(userId);
   }
@@ -409,6 +419,15 @@ export class KycService {
       message: `KYC ${newStatus.toLowerCase()}`,
       diffSummary: { decision: data.decision, reason: data.reason },
     });
+    if (current?.userId) {
+      await this.notifications?.publish({
+        eventType: newStatus === 'APPROVED' ? 'KYC_APPROVED' : 'KYC_REJECTED',
+        userId: current.userId,
+        referenceId: id,
+        dedupeKey: `kyc-decision:${id}:${newStatus}`,
+        variables: { reason: data.reason || '' },
+      });
+    }
 
     return updated;
   }

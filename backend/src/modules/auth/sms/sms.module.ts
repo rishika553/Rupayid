@@ -1,17 +1,16 @@
 import type { Provider } from '@nestjs/common';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { shouldUseDigimiles } from '../../../common/sms/digimiles.client';
 import { SMS_PROVIDER } from './sms-provider';
 import { MockSmsProvider } from './mock-sms.provider';
-import { Msg91SmsProvider } from './msg91-sms.provider';
+import { DigimilesSmsProvider } from './digimiles-sms.provider';
 
 const smsProvider: Provider = {
   provide: SMS_PROVIDER,
   useFactory: (configService: ConfigService) => {
-    const env = configService.get<string>('NODE_ENV');
-    const authKey = configService.get<string>('MSG91_AUTH_KEY');
-    if (env === 'production' && authKey) {
-      return new Msg91SmsProvider(configService);
+    if (shouldUseDigimiles(configService)) {
+      return new DigimilesSmsProvider(configService);
     }
     return new MockSmsProvider();
   },

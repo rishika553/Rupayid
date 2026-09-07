@@ -2,16 +2,16 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { OtpAuthService } from './otp-auth.service';
 import { OtpRateLimitService } from './otp-rate-limit.service';
-import { OTP_CONFIG } from './otp.constants';
+import { OTP_CONFIG, OTP_EXPIRED } from './otp.constants';
 import { hashOtp } from './crypto.util';
 
 const PEPPER = 'test-pepper';
 const PHONE = '+919876543210';
 const OTP = '123456';
 
-function configService() {
+function configService(nodeEnv = 'test') {
   const values: Record<string, string> = {
-    NODE_ENV: 'test',
+    NODE_ENV: nodeEnv,
     JWT_SECRET: 'access-secret',
     JWT_EXPIRES_IN: '15m',
     REFRESH_TOKEN_SECRET: 'refresh-secret',
@@ -189,10 +189,11 @@ function createPrismaStore() {
 function createService(overrides?: {
   rateLimit?: { assertWithinLimit: jest.Mock };
   prismaStore?: ReturnType<typeof createPrismaStore>;
+  nodeEnv?: string;
 }) {
   const store = overrides?.prismaStore || createPrismaStore();
   const jwt = new JwtService({ secret: 'access-secret', signOptions: { expiresIn: '15m' } });
-  const cfg = configService();
+  const cfg = configService(overrides?.nodeEnv);
   const rateLimit =
     overrides?.rateLimit ||
     new OtpRateLimitService({ incr: async () => 1 } as never, cfg as never);
@@ -222,7 +223,7 @@ describe('OtpAuthService', () => {
       const { service, store, sms, referrals } = createService();
       const requested = await service.requestOtp(PHONE, '1.1.1.1');
       expect(sms.sendOtp).toHaveBeenCalledWith({ to: PHONE, otp: OTP });
-      expect(sms.sendOtp.mock.calls[0][0]).not.toHaveProperty('otpLogged');
+      expect(requested.developmentOtp).toBe(OTP);
 
       const result = await service.verifyOtp(PHONE, OTP, requested.otpRequestId as string, '1.1.1.1');
 
@@ -235,6 +236,33 @@ describe('OtpAuthService', () => {
       );
       expect(store.otpRequests[0].status).toBe('USED');
       expect(store.sessions).toHaveLength(2);
+    });
+
+    it('sends SMS in production and does not return a development code', async () => {
+      const { service, sms } = createService({
+        nodeEnv: 'production',
+        rateLimit: { assertWithinLimit: jest.fn().mockResolvedValue(undefined) },
+      });
+      const requested = await service.requestOtp(PHONE, '1.1.1.1');
+      expect(sms.sendOtp).toHaveBeenCalledWith({ to: PHONE, otp: OTP });
+      expect(requested.developmentOtp).toBeUndefined();
+    });
+
+    it('still issues a development OTP when mock SMS fails', async () => {
+      const { service, sms } = createService();
+      sms.sendOtp.mockRejectedValueOnce(new Error('sms down'));
+      const requested = await service.requestOtp(PHONE, '8.8.8.8');
+      expect(requested.developmentOtp).toBe(OTP);
+      expect(requested.otpRequestId).toBeTruthy();
+    });
+
+    it('logs the same mobile number into the same customer', async () => {
+      const { service, store } = createService();
+      const first = await service.requestOtp(PHONE, '1.1.1.1');
+      await service.verifyOtp(PHONE, OTP, first.otpRequestId as string, '1.1.1.1');
+      await service.requestOtp(PHONE, '1.1.1.1');
+      expect(store.users).toHaveLength(1);
+      expect(store.users[0].phoneNumber).toBe(PHONE);
     });
   });
 
@@ -260,9 +288,9 @@ describe('OtpAuthService', () => {
       });
       const { service } = createService({ prismaStore: store });
 
-      await expect(service.verifyOtp(PHONE, OTP, 'otp-exp', '1.1.1.1')).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.verifyOtp(PHONE, OTP, 'otp-exp', '1.1.1.1')).rejects.toMatchObject({
+        message: OTP_EXPIRED,
+      });
       expect(store.otpRequests[0].status).toBe('EXPIRED');
       expect(store.sessions).toHaveLength(0);
     });

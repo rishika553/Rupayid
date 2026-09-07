@@ -12,16 +12,28 @@ import type { PaginationDto } from '../../common/decorators/api-paginated.decora
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Get('my')
+  @Get()
   @ApiOperation({ summary: 'Get my notifications' })
   async myNotifications(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
     return this.notificationsService.findByUser(user.id, pagination.page, pagination.limit);
   }
 
+  @Get('my')
+  @ApiOperation({ summary: 'Get my notifications (legacy alias)' })
+  async myNotificationsAlias(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
+    return this.notificationsService.findByUser(user.id, pagination.page, pagination.limit);
+  }
+
+  @Post('read-all')
+  @ApiOperation({ summary: 'Mark all customer notifications as read' })
+  async markAllAsRead(@CurrentUser() user: CurrentUserPayload) {
+    return this.notificationsService.markAllAsRead(user.id);
+  }
+
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
-  async markAsRead(@Param('id') id: string) {
-    return this.notificationsService.markAsRead(id);
+  async markAsRead(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.notificationsService.markAsRead(id, user.id);
   }
 
   @Post('send')

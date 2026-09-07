@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type Redis from 'ioredis';
-import { REDIS_CLIENT } from '../../common/redis/redis.module';
+import { hasUsableRedisUrl, REDIS_CLIENT } from '../../common/redis/redis.module';
 
 @Injectable()
 export class OtpRateLimitService {
@@ -14,7 +14,7 @@ export class OtpRateLimitService {
 
   async assertWithinLimit(key: string, max: number, windowMs: number): Promise<void> {
     const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
+    if (!hasUsableRedisUrl(redisUrl)) {
       if (this.configService.get<string>('NODE_ENV') === 'production') {
         throw new ServiceUnavailableException('Rate limiter unavailable');
       }
@@ -22,12 +22,20 @@ export class OtpRateLimitService {
       return;
     }
 
-    const count = await this.redis.incr(key);
-    if (count === 1) {
-      await this.redis.pexpire(key, windowMs);
-    }
-    if (count > max) {
-      throw new HttpException('Too many requests. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    try {
+      const count = await this.redis.incr(key);
+      if (count === 1) {
+        await this.redis.pexpire(key, windowMs);
+      }
+      if (count > max) {
+        throw new HttpException('Too many requests. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+      }
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (this.configService.get<string>('NODE_ENV') === 'production') {
+        throw new ServiceUnavailableException('Rate limiter unavailable');
+      }
+      this.consumeMemory(key, max, windowMs);
     }
   }
 

@@ -178,16 +178,17 @@ export class ReferralsService {
     return {
       code: user?.referralCode || null,
       codeCreatedAt: user?.referralCodeCreatedAt || user?.createdAt || null,
+      invitePath: user?.referralCode ? `/login?ref=${user.referralCode}` : null,
       referredBy: inbound
         ? {
             firstName: inbound.referrer.firstName,
             lastName: inbound.referrer.lastName,
             acceptedAt: inbound.createdAt,
+            status: inbound.status,
           }
         : null,
       referredCount: outbound.length,
       referred: outbound.map((row) => ({
-        id: row.id,
         firstName: row.referee.firstName,
         lastName: row.referee.lastName,
         createdAt: row.createdAt,

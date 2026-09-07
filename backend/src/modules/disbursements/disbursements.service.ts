@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class DisbursementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly notifications?: NotificationsService,
+  ) {}
 
   async initiate(loanApplicationId: string, data: {
     amount: number;
@@ -59,7 +64,7 @@ export class DisbursementsService {
   }
 
   async updateStatus(id: string, status: string, providerReference?: string) {
-    await this.findById(id);
+    const current = await this.findById(id);
 
     const updateData: Record<string, unknown> = { status };
 
@@ -72,10 +77,23 @@ export class DisbursementsService {
       updateData.attemptedAt = new Date();
     }
 
-    return this.prisma.loanDisbursement.update({
+    const updated = await this.prisma.loanDisbursement.update({
       where: { id },
       data: updateData as never,
     });
+    if (status === 'SUCCESS') {
+      await this.notifications?.publish({
+        eventType: 'DISBURSEMENT',
+        userId: current.loanApplication.user.id,
+        referenceId: id,
+        dedupeKey: `disbursement:${id}:success`,
+        variables: {
+          amount: new Prisma.Decimal(String(updated.amount)).toFixed(2),
+          applicationNumber: current.loanApplication.applicationNumber,
+        },
+      });
+    }
+    return updated;
   }
 
   async listByStatus(status: string, page = 1, limit = 10) {

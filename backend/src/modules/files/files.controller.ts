@@ -1,7 +1,22 @@
-import { Body, Controller, Delete, ForbiddenException, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { FilesService } from './files.service';
 
 @ApiTags('files')
@@ -9,6 +24,27 @@ import { FilesService } from './files.service';
 @ApiBearerAuth()
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
+
+  @Put('dev-upload')
+  @Public()
+  @ApiOperation({ summary: 'Upload a KYC document to local Phase 1 storage' })
+  async localUpload(
+    @Query('token') token: string,
+    @Headers('content-type') contentType: string,
+    @Req() request: Request,
+  ) {
+    return this.filesService.saveLocalUpload(token, contentType, request);
+  }
+
+  @Get('dev-download')
+  @Public()
+  @ApiOperation({ summary: 'Download a KYC document from local Phase 1 storage' })
+  localDownload(@Query('token') token: string, @Res() response: Response) {
+    const file = this.filesService.openLocalDownload(token);
+    response.setHeader('Content-Type', 'application/octet-stream');
+    response.setHeader('Content-Disposition', `inline; filename="${file.key.split('/').pop()}"`);
+    file.stream.pipe(response);
+  }
 
   @Post('upload-url')
   @ApiOperation({ summary: 'Get a private signed upload URL (no public object URL)' })

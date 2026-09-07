@@ -8,8 +8,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@rupayaid/ui';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient, requireApi } from '@/lib/api-client';
+import { normalizeLoginPhone } from '@/lib/phone';
 
 const schema = z.object({
   phone: z
@@ -41,6 +43,7 @@ function LoginForm() {
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
+    const phone = normalizeLoginPhone(values.phone);
     const code = values.referralCode.trim().toUpperCase();
     if (code) {
       try {
@@ -51,7 +54,9 @@ function LoginForm() {
           setFormError(
             result.reason === 'self'
               ? 'You cannot use your own referral code'
-              : 'That referral code is not valid',
+              : result.reason === 'limit'
+                ? 'This referral code cannot accept more sign-ups'
+                : 'That referral code is not valid',
           );
           return;
         }
@@ -61,10 +66,10 @@ function LoginForm() {
       }
     }
     try {
-      await requestOtp(values.phone, code || undefined);
+      await requestOtp(phone, code || undefined);
       router.push('/verify-otp');
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Could not send OTP');
+      setFormError(error instanceof Error ? error.message : 'Could not send OTP. Try again.');
     }
   }
 
@@ -73,10 +78,20 @@ function LoginForm() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>We will send a one-time code to your mobile number. No password.</CardDescription>
+          <CardDescription>
+            No password. In development, SMS is not sent — use the on-screen code after this step.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+          <form
+            className="space-y-4"
+            onSubmit={form.handleSubmit((values) => {
+              const phone = normalizeLoginPhone(values.phone);
+              form.setValue('phone', phone);
+              return onSubmit({ ...values, phone });
+            })}
+            noValidate
+          >
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile number</Label>
               <Input
@@ -120,9 +135,20 @@ function LoginForm() {
   );
 }
 
+function LoginFallback() {
+  return (
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-3">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    </main>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
+    <Suspense fallback={<LoginFallback />}>
       <LoginForm />
     </Suspense>
   );

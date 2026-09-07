@@ -15,8 +15,12 @@ export class ReferralsController {
   @Post('validate')
   @Public()
   @ApiOperation({ summary: 'Check whether a referral code can be used at sign-up' })
-  async validate(@Body() dto: ValidateReferralDto, @Req() req: Request) {
-    return this.referralsService.validateCode(dto.code, clientIp(req));
+  async validate(
+    @Body() dto: ValidateReferralDto,
+    @Req() req: Request,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
+    return this.referralsService.validateCode(dto.code, clientIp(req), user?.id);
   }
 
   @Get('me')

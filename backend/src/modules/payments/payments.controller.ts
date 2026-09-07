@@ -1,11 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { PaymentsService } from './payments.service';
-import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import type { PaginationDto} from '../../common/decorators/api-paginated.decorator';
+import { Body, Controller, Get, Headers, Param, Post, Patch, Query, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.decorator';
+import type { PaginationDto } from '../../common/decorators/api-paginated.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CreateCustomerPaymentDto } from './dto/create-payment.dto';
+import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -13,8 +16,46 @@ import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.deco
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Post('create')
+  @ApiOperation({ summary: 'Create a customer repayment against an installment' })
+  async createCustomerPayment(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() data: CreateCustomerPaymentDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.paymentsService.createCustomerPayment(user.id, {
+      loanId: data.loanId,
+      installmentNumber: data.installmentNumber,
+      idempotencyKey: idempotencyKey || data.idempotencyKey,
+    });
+  }
+
+  @Post('webhook/razorpay')
+  @Public()
+  @ApiOperation({ summary: 'Razorpay webhook (signature verified)' })
+  async razorpayWebhook(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers('x-razorpay-signature') signature?: string,
+  ) {
+    const rawBody = req.rawBody || (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+    return this.paymentsService.handleProviderWebhook(rawBody, signature);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'List the current customer payments' })
+  async myPayments(@CurrentUser() user: CurrentUserPayload) {
+    return this.paymentsService.listMine(user.id);
+  }
+
+  @Get('my')
+  @ApiOperation({ summary: 'List the current customer payments' })
+  async myPaymentsAlias(@CurrentUser() user: CurrentUserPayload) {
+    return this.paymentsService.listMine(user.id);
+  }
+
   @Post()
-  @ApiOperation({ summary: 'Initiate a payment' })
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Initiate a payment (admin)' })
   async create(
     @CurrentUser() user: CurrentUserPayload,
     @Body() data: {
@@ -35,28 +76,23 @@ export class PaymentsController {
   }
 
   @Get()
+  @Roles('ADMIN', 'UNDERWRITER')
   @ApiPaginatedResponse()
   @ApiOperation({ summary: 'List payments by status' })
   async listByStatus(@Query('status') status: string, @Query() pagination: PaginationDto) {
     return this.paymentsService.listByStatus(status, pagination.page, pagination.limit);
   }
 
-  @Get('my')
-  @ApiOperation({ summary: 'Get my payments' })
-  async myPayments(@CurrentUser() user: CurrentUserPayload) {
-    return this.paymentsService.listByUser(user.id);
-  }
-
   @Get('ref/:txRef')
   @ApiOperation({ summary: 'Get payment by transaction reference' })
-  async findByTxRef(@Param('txRef') txRef: string) {
-    return this.paymentsService.findByTxRef(txRef);
+  async findByTxRef(@Param('txRef') txRef: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.paymentsService.findByTxRef(txRef, user.id);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get payment by ID' })
-  async findOne(@Param('id') id: string) {
-    return this.paymentsService.findById(id);
+  @ApiOperation({ summary: 'Get a customer payment by ID' })
+  async findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.paymentsService.getCustomerPayment(id, user.id);
   }
 
   @Patch(':id/status')
