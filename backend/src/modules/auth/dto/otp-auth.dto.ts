@@ -6,6 +6,27 @@ export class RequestOtpDto {
   @IsString()
   @Matches(/^(\+91)?[6-9]\d{9}$/, { message: 'Enter a valid Indian mobile number' })
   phone!: string;
+
+  @ApiProperty({ required: false, example: 'Ria' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  firstName?: string;
+
+  @ApiProperty({ required: false, example: 'Shah' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  lastName?: string;
+
+  @ApiProperty({ required: false, example: 'Ria Shah' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  name?: string;
 }
 
 export class VerifyOtpDto {
@@ -30,6 +51,27 @@ export class VerifyOtpDto {
   @IsString()
   @Matches(/^RAP-[A-Z0-9]{8}$/i, { message: 'Enter a valid referral code' })
   referralCode?: string;
+
+  @ApiProperty({ required: false, example: 'Ria' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  firstName?: string;
+
+  @ApiProperty({ required: false, example: 'Shah' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  lastName?: string;
+
+  @ApiProperty({ required: false, example: 'Ria Shah' })
+  @IsOptional()
+  @ValidateIf((_, value) => Boolean(value))
+  @IsString()
+  @Length(1, 80)
+  name?: string;
 }
 
 export class RefreshSessionDto {

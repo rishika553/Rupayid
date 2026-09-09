@@ -65,7 +65,12 @@ export class OtpAuthService {
     @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
-  async requestOtp(rawPhone: string, ip: string, userAgent?: string) {
+  async requestOtp(
+    rawPhone: string,
+    ip: string,
+    userAgent?: string,
+    displayName?: { firstName?: string; lastName?: string; name?: string },
+  ) {
     const phone = normalizeIndianMobile(rawPhone);
     await this.rateLimit.assertWithinLimit(
       `otp:req:ip:${ip}`,
@@ -73,7 +78,8 @@ export class OtpAuthService {
       OTP_CONFIG.requestPerIp.windowMs,
     );
 
-    const user = await this.findOrCreateCustomer(phone, ip, userAgent);
+    const signedInName = resolveDisplayName(displayName);
+    const user = await this.findOrCreateCustomer(phone, ip, userAgent, signedInName);
     if (this.isBlocked(user.status)) {
       this.logger.warn(`OTP request skipped for blocked account ${maskPhone(phone)}`);
       return this.genericRequestResponse();
@@ -117,7 +123,12 @@ export class OtpAuthService {
         cooldownUntil,
         attempts: 0,
         maxAttempts: OTP_CONFIG.maxAttempts,
-        metadata: { ip, userAgent: userAgent || null },
+        metadata: {
+          ip,
+          userAgent: userAgent || null,
+          firstName: signedInName.firstName || null,
+          lastName: signedInName.lastName ?? null,
+        },
       },
     });
 
@@ -174,6 +185,7 @@ export class OtpAuthService {
     ip: string,
     userAgent?: string,
     referralCode?: string,
+    displayName?: { firstName?: string; lastName?: string; name?: string },
   ) {
     const phone = normalizeIndianMobile(rawPhone);
 
@@ -245,13 +257,17 @@ export class OtpAuthService {
       this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d'),
     );
 
+    const signedInName = resolveDisplayName(displayName, request.metadata);
     const [updatedUser] = await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: user.id },
         data: {
+          phoneNumber: phone,
           phoneVerified: true,
           lastLoginAt: now,
           status: user.status === 'PENDING_VERIFICATION' ? 'ACTIVE' : user.status,
+          ...(signedInName.firstName ? { firstName: signedInName.firstName } : {}),
+          ...(signedInName.lastName !== undefined ? { lastName: signedInName.lastName } : {}),
         },
         select: SELECT_USER,
       }),
@@ -554,9 +570,28 @@ export class OtpAuthService {
     });
   }
 
-  private async findOrCreateCustomer(phone: string, ip?: string, userAgent?: string) {
+  private async findOrCreateCustomer(
+    phone: string,
+    ip?: string,
+    userAgent?: string,
+    displayName?: { firstName?: string; lastName?: string; name?: string },
+  ) {
+    const { firstName, lastName } = resolveDisplayName(displayName);
     const existing = await this.prisma.user.findUnique({ where: { phoneNumber: phone } });
     if (existing) {
+      if (firstName || lastName !== undefined) {
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            phoneNumber: phone,
+            ...(firstName ? { firstName } : {}),
+            ...(lastName !== undefined ? { lastName } : {}),
+          },
+        });
+        existing.firstName = firstName || existing.firstName;
+        existing.lastName = lastName !== undefined ? lastName : existing.lastName;
+        existing.phoneNumber = phone;
+      }
       if (!existing.referralCode) {
         await this.referrals.provisionForUser(existing.id, ip, userAgent);
       }
@@ -571,8 +606,8 @@ export class OtpAuthService {
       data: {
         email: `otp.${digits}@users.rupayaid.internal`,
         passwordHash,
-        firstName: 'Customer',
-        lastName: digits.slice(-4),
+        firstName: firstName || 'Customer',
+        lastName: lastName || '',
         phoneNumber: phone,
         phoneVerified: false,
         status: 'PENDING_VERIFICATION',
@@ -586,4 +621,49 @@ export class OtpAuthService {
     await this.referrals.provisionForUser(created.id, ip, userAgent);
     return created;
   }
+}
+
+function resolveDisplayName(
+  displayName?: { firstName?: string; lastName?: string; name?: string },
+  metadata?: unknown,
+) {
+  const meta =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? (metadata as Record<string, unknown>)
+      : {};
+  const firstFromFields =
+    sanitizePersonName(displayName?.firstName) || sanitizePersonName(asOptionalString(meta.firstName));
+  const lastFromFields = hasNameValue(displayName?.lastName)
+    ? sanitizePersonName(displayName?.lastName) || ''
+    : hasNameValue(asOptionalString(meta.lastName))
+      ? sanitizePersonName(asOptionalString(meta.lastName)) || ''
+      : undefined;
+  if (firstFromFields || lastFromFields !== undefined) {
+    return { firstName: firstFromFields, lastName: lastFromFields };
+  }
+  const full = sanitizePersonName(displayName?.name) || sanitizePersonName(asOptionalString(meta.name));
+  if (!full) {
+    return {};
+  }
+  const parts = full.split(' ');
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') || '' };
+}
+
+function hasNameValue(value?: string) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function sanitizePersonName(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+  const cleaned = value.replace(/\s+/g, ' ').trim();
+  if (cleaned.length < 1 || cleaned.length > 80) {
+    return undefined;
+  }
+  return cleaned;
 }

@@ -304,7 +304,6 @@ async function main() {
     { name: 'maximum_age', key: 'max_age', ruleType: 'AGE' as const, operator: 'LESS_THAN_OR_EQUAL' as const, value: 58, description: 'Borrower must be 58 or younger at loan end' },
     { name: 'minimum_income', key: 'min_income', ruleType: 'INCOME' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 15000, description: 'Min monthly income ₹15K' },
     { name: 'minimum_credit_score', key: 'min_credit_score', ruleType: 'CREDIT_SCORE' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 650, description: 'Minimum CIBIL score 650' },
-    { name: 'allowed_cities', key: 'allowed_cities', ruleType: 'CITY_POSTCODE' as const, operator: 'IN' as const, value: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'], description: 'Tier-1 cities only at launch' },
   ];
 
   const createdRules = [];
@@ -338,7 +337,22 @@ async function main() {
     createdRules.push(created);
   }
 
-  console.log('  ✓ 5 eligibility rules');
+  const cityRestriction = await prisma.eligibilityRule.findUnique({ where: { key: 'allowed_cities' } });
+  if (cityRestriction) {
+    await prisma.eligibilityRule.update({
+      where: { id: cityRestriction.id },
+      data: {
+        status: 'INACTIVE',
+        description: 'Retired — lending is pan India, not limited to selected cities',
+      },
+    });
+    await prisma.eligibilityRuleVersion.updateMany({
+      where: { ruleId: cityRestriction.id },
+      data: { status: 'DEPRECATED' },
+    });
+  }
+
+  console.log('  ✓ 4 eligibility rules (location is pan India)');
 
   // ──────────────────────────────────────────────────────────────
   // 6. Ledgers

@@ -28,9 +28,12 @@ export class RepaymentsController {
   }
 
   @Get('loan/:loanApplicationId')
-  @ApiOperation({ summary: 'Get repayments for loan' })
-  async findByLoan(@Param('loanApplicationId') loanApplicationId: string) {
-    return this.repaymentsService.findByLoan(loanApplicationId);
+  @ApiOperation({ summary: 'Get repayments for an owned loan' })
+  async findByLoan(
+    @Param('loanApplicationId') loanApplicationId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.repaymentsService.findByLoan(loanApplicationId, user.id);
   }
 
   @Post()

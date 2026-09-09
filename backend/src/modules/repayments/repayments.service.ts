@@ -42,7 +42,14 @@ export class RepaymentsService {
     });
   }
 
-  async findByLoan(loanApplicationId: string) {
+  async findByLoan(loanApplicationId: string, requesterId: string) {
+    const loan = await this.prisma.loanApplication.findUnique({
+      where: { id: loanApplicationId },
+      select: { id: true, userId: true },
+    });
+    if (!loan || loan.userId !== requesterId) {
+      throw new NotFoundException('Loan application not found');
+    }
     return this.prisma.repayment.findMany({
       where: { loanApplicationId },
       include: { schedule: true, payment: true },

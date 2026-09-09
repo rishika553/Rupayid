@@ -32,7 +32,7 @@ const optionalText = (max: number) =>
 
 const schema = z.object({
   firstName: z.string().trim().min(1, 'Required').max(80),
-  lastName: z.string().trim().min(1, 'Required').max(80),
+  lastName: z.string().trim().max(80),
   middleName: optionalText(80),
   dateOfBirth: z
     .string()

@@ -55,7 +55,10 @@ export default function VerifyOtpPage() {
     }
     setFormError(null);
     try {
-      await verifyOtp(pending.phone, values.otp, pending.otpRequestId, pending.referralCode);
+      await verifyOtp(pending.phone, values.otp, pending.otpRequestId, pending.referralCode, {
+        firstName: pending.firstName,
+        lastName: pending.lastName,
+      });
       router.push('/dashboard');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Verification failed');
@@ -75,7 +78,13 @@ export default function VerifyOtpPage() {
     setFormError(null);
     setResending(true);
     try {
-      await requestOtp(pending.phone, pending.referralCode);
+      await requestOtp(
+        pending.phone,
+        pending.referralCode,
+        pending.firstName
+          ? { firstName: pending.firstName, lastName: pending.lastName }
+          : undefined,
+      );
       const next = readPendingOtp();
       if (next) {
         setPending(next);
@@ -159,4 +168,4 @@ export default function VerifyOtpPage() {
     </main>
   );
 }
-
+

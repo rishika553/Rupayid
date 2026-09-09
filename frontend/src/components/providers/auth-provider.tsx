@@ -17,8 +17,18 @@ interface AuthContextValue {
   user: CustomerUser | null;
   isReady: boolean;
   isAuthenticated: boolean;
-  requestOtp: (phone: string, referralCode?: string) => Promise<void>;
-  verifyOtp: (phone: string, otp: string, otpRequestId: string, referralCode?: string) => Promise<void>;
+  requestOtp: (
+    phone: string,
+    referralCode?: string,
+    displayName?: { firstName: string; lastName?: string; name?: string },
+  ) => Promise<void>;
+  verifyOtp: (
+    phone: string,
+    otp: string,
+    otpRequestId: string,
+    referralCode?: string,
+    displayName?: { firstName?: string; lastName?: string; name?: string },
+  ) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -52,7 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshUser().finally(() => setIsReady(true));
   }, [refreshUser]);
 
-  const requestOtp = useCallback(async (phone: string, referralCode?: string) => {
+  const requestOtp = useCallback(async (
+    phone: string,
+    referralCode?: string,
+    displayName?: { firstName: string; lastName?: string; name?: string },
+  ) => {
     const data = await requireApi(
       apiClient.post<{
         otpRequestId: string;
@@ -60,7 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cooldownSeconds?: number;
         message: string;
         developmentOtp?: string;
-      }>('/auth/request-otp', { phone }),
+      }>('/auth/request-otp', {
+        phone,
+        firstName: displayName?.firstName,
+        lastName: displayName?.lastName,
+        name: displayName?.name,
+      }),
     );
     const cooldownUntil = data.cooldownSeconds
       ? new Date(Date.now() + data.cooldownSeconds * 1000).toISOString()
@@ -72,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cooldownUntil,
       referralCode: referralCode?.trim() ? referralCode.trim().toUpperCase() : undefined,
       developmentOtp: data.developmentOtp,
+      firstName: displayName?.firstName,
+      lastName: displayName?.lastName,
     });
     toast({
       title: data.developmentOtp ? 'Development OTP ready' : 'OTP sent',
@@ -82,11 +103,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   const verifyOtp = useCallback(
-    async (phone: string, otp: string, otpRequestId: string, referralCode?: string) => {
+    async (phone: string, otp: string, otpRequestId: string, referralCode?: string, displayName?: { firstName?: string; lastName?: string; name?: string }) => {
       const data = await requireApi(
         apiClient.post<{ accessToken: string; refreshToken: string; user: CustomerUser }>(
           '/auth/verify-otp',
-          { phone, otp, otpRequestId, referralCode: referralCode || undefined },
+          {
+            phone,
+            otp,
+            otpRequestId,
+            referralCode: referralCode || undefined,
+            firstName: displayName?.firstName,
+            lastName: displayName?.lastName,
+            name: displayName?.name,
+          },
         ),
       );
       writeAuth({ accessToken: data.accessToken, refreshToken: data.refreshToken });
@@ -133,4 +162,4 @@ export function useAuth() {
   }
   return ctx;
 }
-
+

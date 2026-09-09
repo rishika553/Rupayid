@@ -256,6 +256,48 @@ describe('OtpAuthService', () => {
       expect(requested.otpRequestId).toBeTruthy();
     });
 
+    it('stores the sign-in name on the customer', async () => {
+      const { service, store } = createService();
+      const requested = await service.requestOtp(PHONE, '1.1.1.1', 'test-agent', {
+        firstName: 'Ria',
+        lastName: 'Shah',
+      });
+      expect(store.users[0].firstName).toBe('Ria');
+      expect(store.users[0].lastName).toBe('Shah');
+      const result = await service.verifyOtp(PHONE, OTP, requested.otpRequestId as string, '1.1.1.1');
+      expect(result.user.firstName).toBe('Ria');
+      expect(result.user.lastName).toBe('Shah');
+      expect(store.users[0].phoneNumber).toBe(PHONE);
+    });
+
+    it('stores a single sign-in name with the mobile number', async () => {
+      const { service, store } = createService();
+      await service.requestOtp(PHONE, '1.1.1.1', 'test-agent', { name: 'Ria Shah' });
+      expect(store.users[0].phoneNumber).toBe(PHONE);
+      expect(store.users[0].firstName).toBe('Ria');
+      expect(store.users[0].lastName).toBe('Shah');
+    });
+
+    it('allows sign-in with first name only', async () => {
+      const { service, store } = createService();
+      await service.requestOtp(PHONE, '1.1.1.1', 'test-agent', { firstName: 'Ria' });
+      expect(store.users[0].firstName).toBe('Ria');
+      expect(store.users[0].lastName).toBe('');
+    });
+
+    it('updates the stored name when a returning customer signs in again', async () => {
+      const { service, store } = createService();
+      const first = await service.requestOtp(PHONE, '1.1.1.1', 'test-agent', {
+        firstName: 'Ria',
+        lastName: 'Shah',
+      });
+      await service.verifyOtp(PHONE, OTP, first.otpRequestId as string, '1.1.1.1');
+      await service.requestOtp(PHONE, '1.1.1.1', 'test-agent', { firstName: 'Riya', lastName: 'Mehta' });
+      expect(store.users).toHaveLength(1);
+      expect(store.users[0].firstName).toBe('Riya');
+      expect(store.users[0].lastName).toBe('Mehta');
+    });
+
     it('logs the same mobile number into the same customer', async () => {
       const { service, store } = createService();
       const first = await service.requestOtp(PHONE, '1.1.1.1');

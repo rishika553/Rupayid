@@ -58,6 +58,23 @@ function prismaStub() {
 }
 
 describe('KycService ownership', () => {
+  it('does not return another customer KYC on getMine', async () => {
+    const stub = prismaStub();
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.getMine('user-2')).rejects.toBeInstanceOf(NotFoundException);
+    expect(stub.prisma.kycApplication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-2' } }),
+    );
+  });
+
+  it('returns only the authenticated customer KYC on getMine', async () => {
+    const stub = prismaStub();
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    const mine = await service.getMine('user-1');
+    expect(mine).toHaveProperty('id', 'kyc-1');
+    expect(mine).not.toHaveProperty('userId');
+  });
+
   it('forbids loading another customer KYC by id', async () => {
     const stub = prismaStub();
     const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);

@@ -93,7 +93,52 @@ describe('DashboardService', () => {
     expect(result.payments.recent[0].amount).toBe('1000.00');
     expect(result.referral).toMatchObject({ referredCount: 2, convertedCount: 1 });
     expect(result.notifications.unreadCount).toBe(3);
-    expect(prisma.loanApplication.findFirst).toHaveBeenCalledTimes(1);
+    expect(prisma.loanApplication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'user-1' }),
+      }),
+    );
+    expect(prisma.notification.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'user-1' }),
+      }),
+    );
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'user-1' } }),
+    );
+    expect(prisma.referral.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { referrerId: 'user-1' },
+      }),
+    );
+  });
+
+  it('loads dashboard rows only for the authenticated customer', async () => {
+    const { service, prisma } = harness();
+    prisma.user.findUnique = jest.fn(async ({ where }: { where: { id: string } }) =>
+      where.id === 'user-2'
+        ? {
+            firstName: 'Other',
+            lastName: 'Customer',
+            referralCode: 'RAP-OTHER000',
+            kycApplications: [{ id: 'kyc-2', status: 'APPROVED' }],
+            referralsTaken: [],
+            loanApplications: [],
+            Payment: [],
+          }
+        : null,
+    );
+    prisma.loanApplication.findFirst = jest.fn(async ({ where }: { where: { userId: string } }) =>
+      where.userId === 'user-2' ? null : { id: 'should-not-leak' },
+    );
+    const result = await service.getCustomerDashboard('user-2');
+    expect(result.customer.fullName).toBe('Other Customer');
+    expect(result.kyc.id).toBe('kyc-2');
+    expect(result.loan.activeLoan).toBeNull();
+    expect(result.kyc.id).not.toBe('kyc-1');
+    expect(prisma.loanApplication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: 'user-2' }) }),
+    );
   });
 
   it('returns 404 when the authenticated customer no longer exists', async () => {

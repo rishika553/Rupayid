@@ -22,7 +22,11 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Request a login OTP over SMS' })
   async requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
-    return this.otpAuthService.requestOtp(dto.phone, clientIp(req), req.headers['user-agent']);
+    return this.otpAuthService.requestOtp(dto.phone, clientIp(req), req.headers['user-agent'], {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      name: dto.name,
+    });
   }
 
   @Post('verify-otp')
@@ -37,6 +41,7 @@ export class AuthController {
       clientIp(req),
       req.headers['user-agent'],
       dto.referralCode,
+      { firstName: dto.firstName, lastName: dto.lastName, name: dto.name },
     );
   }
 

@@ -14,6 +14,17 @@ import { apiClient, requireApi } from '@/lib/api-client';
 import { normalizeLoginPhone } from '@/lib/phone';
 
 const schema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(1, 'Enter your first name')
+    .max(80, 'First name is too long')
+    .regex(/^[\p{L}][\p{L} .'-]{0,79}$/u, 'Enter a valid first name'),
+  lastName: z
+    .string()
+    .trim()
+    .max(80, 'Last name is too long')
+    .regex(/^$|^[\p{L}][\p{L} .'-]{0,79}$/u, 'Enter a valid last name'),
   phone: z
     .string()
     .regex(/^(\+91)?[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
@@ -31,7 +42,7 @@ function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { phone: '', referralCode: '' },
+    defaultValues: { firstName: '', lastName: '', phone: '', referralCode: '' },
   });
 
   useEffect(() => {
@@ -66,7 +77,11 @@ function LoginForm() {
       }
     }
     try {
-      await requestOtp(phone, code || undefined);
+      await requestOtp(phone, code || undefined, {
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim() || undefined,
+        name: [values.firstName.trim(), values.lastName.trim()].filter(Boolean).join(' '),
+      });
       router.push('/verify-otp');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not send OTP. Try again.');
@@ -92,6 +107,34 @@ function LoginForm() {
             })}
             noValidate
           >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First name</Label>
+                <Input
+                  id="firstName"
+                  autoComplete="given-name"
+                  placeholder="Ria"
+                  aria-invalid={Boolean(form.formState.errors.firstName)}
+                  {...form.register('firstName')}
+                />
+                {form.formState.errors.firstName ? (
+                  <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last name (optional)</Label>
+                <Input
+                  id="lastName"
+                  autoComplete="family-name"
+                  placeholder="Shah"
+                  aria-invalid={Boolean(form.formState.errors.lastName)}
+                  {...form.register('lastName')}
+                />
+                {form.formState.errors.lastName ? (
+                  <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p>
+                ) : null}
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile number</Label>
               <Input

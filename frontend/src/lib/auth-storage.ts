@@ -13,6 +13,8 @@ export interface PendingOtp {
   cooldownUntil?: string;
   referralCode?: string;
   developmentOtp?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 function browserStorage(kind: 'localStorage' | 'sessionStorage'): Storage | null {
