@@ -129,8 +129,9 @@ function harness() {
       }),
     },
     $queryRaw: jest.fn(async () => []),
-    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
+    $transaction: jest.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
 
   const provider = {
     name: 'razorpay',

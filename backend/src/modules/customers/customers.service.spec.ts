@@ -40,7 +40,7 @@ function prismaStub(user = baseUser()) {
         findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
           where.id === user.id ? user : null,
         ),
-        findFirst: jest.fn(async () => null),
+        findFirst: jest.fn(async (): Promise<{ id: string } | null> => null),
         update: jest.fn(),
       },
       customerProfile: {

@@ -66,17 +66,18 @@ describe('LoansController customer integration', () => {
     systemSetting: { findUnique: jest.fn(async () => ({ value: true })) },
     eligibilityEvaluation: { update: jest.fn(async () => ({})) },
     usersOnRoles: { findMany: jest.fn(async () => []) },
-    $transaction: jest.fn(async (arg: unknown) => {
-      if (typeof arg === 'function') {
-        return (arg as (client: typeof prisma) => Promise<unknown>)(prisma);
-      }
-      if (Array.isArray(arg)) {
-        return Promise.all(arg);
-      }
-      return arg;
-    }),
+    $transaction: jest.fn(),
     $queryRaw: jest.fn(async () => [{ id: 'app-int-1' }]),
   };
+  prisma.$transaction.mockImplementation(async (arg: unknown) => {
+    if (typeof arg === 'function') {
+      return (arg as (client: unknown) => Promise<unknown>)(prisma);
+    }
+    if (Array.isArray(arg)) {
+      return Promise.all(arg);
+    }
+    return arg;
+  });
 
   const user = { id: 'user-1', email: 'a@b.c' };
   let controller: LoansController;

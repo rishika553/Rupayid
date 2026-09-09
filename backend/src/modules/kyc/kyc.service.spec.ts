@@ -11,9 +11,9 @@ function prismaStub() {
     reviewedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    details: null,
-    documents: [],
-    decisions: [],
+    details: null as null,
+    documents: [] as Array<{ id: string }>,
+    decisions: [] as Array<{ decision: string; reason: string }>,
     notes: 'secret',
   };
   return {
@@ -23,8 +23,8 @@ function prismaStub() {
         findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
           where.id === app.id ? { ...app, user: { id: app.userId } } : null,
         ),
-        findFirst: jest.fn(async ({ where }: { where: { userId?: string } }) =>
-          where.userId === app.userId ? app : null,
+        findFirst: jest.fn(async (_args?: { where: { userId?: string } }) =>
+          _args?.where.userId === app.userId ? app : null,
         ),
       },
       kycDocument: {
@@ -125,7 +125,7 @@ describe('KycService ownership', () => {
 describe('KycService status', () => {
   it('returns NOT_STARTED when the customer has no application', async () => {
     const stub = prismaStub();
-    stub.prisma.kycApplication.findFirst = jest.fn(async () => null);
+    stub.prisma.kycApplication.findFirst.mockResolvedValue(null);
     const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
     const status = await service.getStatus('user-1');
     expect(status).toMatchObject({

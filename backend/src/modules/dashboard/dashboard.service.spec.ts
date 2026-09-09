@@ -2,6 +2,54 @@ import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DashboardService } from './dashboard.service';
 
+type DashboardUser = {
+  firstName: string;
+  lastName: string;
+  referralCode: string;
+  kycApplications: Array<{ id: string; status: string }>;
+  referralsTaken: unknown[];
+  loanApplications: Array<{
+    id: string;
+    applicationNumber: string;
+    status: string;
+    amountRequested: Prisma.Decimal;
+    createdAt: Date;
+    loanProduct: { name: string };
+  }>;
+  Payment: Array<{
+    id: string;
+    txRef: string;
+    amount: Prisma.Decimal;
+    currency: string;
+    method: string;
+    type: string;
+    status: string;
+    createdAt: Date;
+  }>;
+};
+
+type DashboardLoan = {
+  id: string;
+  applicationNumber: string;
+  status: string;
+  amountRequested: Prisma.Decimal;
+  tenureMonths: number;
+  updatedAt: Date;
+  loanProduct: { name: string };
+  approvals: Array<{ approvedAmount: Prisma.Decimal }>;
+  repaymentSchedule: Array<{
+    id: string;
+    sequence: number;
+    dueDate: Date;
+    principalPortion: Prisma.Decimal;
+    interestPortion: Prisma.Decimal;
+    penaltyPortion: Prisma.Decimal;
+    totalAmount: Prisma.Decimal;
+    paidAmount: Prisma.Decimal;
+    status: string;
+  }>;
+};
+
 function harness(options?: { missingUser?: boolean }) {
   const currentApplication = {
     id: 'application-1',
@@ -36,33 +84,36 @@ function harness(options?: { missingUser?: boolean }) {
   };
   const prisma = {
     user: {
-      findUnique: jest.fn(async () =>
-        options?.missingUser
-          ? null
-          : {
-              firstName: 'Rishika',
-              lastName: 'Customer',
-              referralCode: 'RAP-ABCD1234',
-              kycApplications: [{ id: 'kyc-1', status: 'DRAFT' }],
-              referralsTaken: [],
-              loanApplications: [currentApplication],
-              Payment: [
-                {
-                  id: 'payment-1',
-                  txRef: 'TXN-1',
-                  amount: new Prisma.Decimal('1000'),
-                  currency: 'INR',
-                  method: 'UPI',
-                  type: 'EMI_REPAYMENT',
-                  status: 'SUCCESS',
-                  createdAt: new Date('2026-09-05'),
-                },
-              ],
-            },
+      findUnique: jest.fn(
+        async (_args?: { where: { id: string } }): Promise<DashboardUser | null> =>
+          options?.missingUser
+            ? null
+            : {
+                firstName: 'Rishika',
+                lastName: 'Customer',
+                referralCode: 'RAP-ABCD1234',
+                kycApplications: [{ id: 'kyc-1', status: 'DRAFT' }],
+                referralsTaken: [],
+                loanApplications: [currentApplication],
+                Payment: [
+                  {
+                    id: 'payment-1',
+                    txRef: 'TXN-1',
+                    amount: new Prisma.Decimal('1000'),
+                    currency: 'INR',
+                    method: 'UPI',
+                    type: 'EMI_REPAYMENT',
+                    status: 'SUCCESS',
+                    createdAt: new Date('2026-09-05'),
+                  },
+                ],
+              },
       ),
     },
     loanApplication: {
-      findFirst: jest.fn(async () => activeLoan),
+      findFirst: jest.fn(
+        async (_args?: { where: { userId: string } }): Promise<DashboardLoan | null> => activeLoan,
+      ),
     },
     referral: {
       groupBy: jest.fn(async () => [
@@ -115,8 +166,8 @@ describe('DashboardService', () => {
 
   it('loads dashboard rows only for the authenticated customer', async () => {
     const { service, prisma } = harness();
-    prisma.user.findUnique = jest.fn(async ({ where }: { where: { id: string } }) =>
-      where.id === 'user-2'
+    prisma.user.findUnique.mockImplementation(async (args?: { where: { id: string } }) =>
+      args?.where.id === 'user-2'
         ? {
             firstName: 'Other',
             lastName: 'Customer',
@@ -128,9 +179,7 @@ describe('DashboardService', () => {
           }
         : null,
     );
-    prisma.loanApplication.findFirst = jest.fn(async ({ where }: { where: { userId: string } }) =>
-      where.userId === 'user-2' ? null : { id: 'should-not-leak' },
-    );
+    prisma.loanApplication.findFirst.mockResolvedValue(null);
     const result = await service.getCustomerDashboard('user-2');
     expect(result.customer.fullName).toBe('Other Customer');
     expect(result.kyc.id).toBe('kyc-2');

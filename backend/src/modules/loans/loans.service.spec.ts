@@ -85,17 +85,18 @@ function harness(seed: { apps?: Array<Record<string, unknown>>; kycStatus?: stri
     usersOnRoles: {
       findMany: jest.fn(async () => []),
     },
-    $transaction: jest.fn(async (arg: unknown) => {
-      if (typeof arg === 'function') {
-        return arg(prisma);
-      }
-      if (Array.isArray(arg)) {
-        return Promise.all(arg);
-      }
-      return arg;
-    }),
+    $transaction: jest.fn(),
     $queryRaw: jest.fn(async () => [{ id: 'app-1' }]),
   };
+  prisma.$transaction.mockImplementation(async (arg: unknown) => {
+    if (typeof arg === 'function') {
+      return (arg as (client: unknown) => Promise<unknown>)(prisma);
+    }
+    if (Array.isArray(arg)) {
+      return Promise.all(arg);
+    }
+    return arg;
+  });
   const eligibility = {
     evaluate: jest.fn(async () => ({
       reference: 'eval-1',
@@ -127,7 +128,7 @@ describe('LoansService customer flow', () => {
       tenureMonths: 12,
     });
     expect(result.status).toBe('DRAFT');
-    expect(result.costBreakdown).toMatchObject({
+    expect((result as { costBreakdown?: { amount: string; processingFee: string } }).costBreakdown).toMatchObject({
       amount: '100000.00',
       processingFee: '1000.00',
     });

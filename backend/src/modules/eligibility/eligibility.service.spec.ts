@@ -67,14 +67,15 @@ function service(overrides?: {
         },
       ]),
     },
-    $transaction: jest.fn(async (fn: (tx: typeof prisma) => Promise<void>) => fn(prisma)),
     eligibilityEvaluation: {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         created.push(data);
         return data;
       }),
     },
+    $transaction: jest.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn(prisma));
   const loanProducts = {
     isOfferedToCustomers: jest.fn((row: { isActive?: boolean }) => row.isActive === true),
     toCustomerProduct: jest.fn(() => ({
