@@ -19,7 +19,7 @@
     "lint:fix": "pnpm -r --if-present lint:fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r test",
     "test:e2e": "pnpm -r test:e2e",
     "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",

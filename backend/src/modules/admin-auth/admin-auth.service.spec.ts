@@ -68,7 +68,7 @@ describe('AdminAuthService', () => {
         metadata: expect.objectContaining({ adminUserId: 'admin-1', action: 'ADMIN_LOGIN' }),
       }),
     );
-    expect(JSON.stringify(audit.log.mock.calls[0][0])).not.toMatch(/password|otp|accessToken|admin\.jwt/i);
+    expect(JSON.stringify(audit.log.mock.calls)).not.toMatch(/password|otp|accessToken|admin\.jwt/i);
   });
 
   it('rejects a wrong password', async () => {
@@ -123,6 +123,6 @@ describe('AdminAuthService', () => {
         metadata: expect.objectContaining({ adminUserId: 'admin-1', action: 'ADMIN_LOGOUT' }),
       }),
     );
-    expect(JSON.stringify(audit.log.mock.calls[0][0])).not.toMatch(/password|otp|accessToken|admin\.jwt/i);
+    expect(JSON.stringify(audit.log.mock.calls)).not.toMatch(/password|otp|accessToken|admin\.jwt/i);
   });
 });

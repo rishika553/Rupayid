@@ -227,7 +227,7 @@ describe('AdminKycService', () => {
         }),
       }),
     );
-    expect(JSON.stringify(audit.log.mock.calls[0][0])).not.toMatch(/fileStorageKey|R2_|SECRET|ACCESS_KEY/i);
+    expect(JSON.stringify(audit.log.mock.calls)).not.toMatch(/fileStorageKey|R2_|SECRET|ACCESS_KEY/i);
   });
 
   it('blocks IDOR: a document from another KYC cannot be opened by guessing its id', async () => {
