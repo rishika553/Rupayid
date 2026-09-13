@@ -33,6 +33,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, OtpAuthService, OtpGenerator, OtpRateLimitService, JwtStrategy],
-  exports: [AuthService, OtpAuthService],
+  exports: [AuthService, OtpAuthService, OtpRateLimitService],
 })
 export class AuthModule {}

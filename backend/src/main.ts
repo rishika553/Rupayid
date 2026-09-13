@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -24,7 +24,12 @@ async function bootstrap() {
 
   // Global prefix
   const apiPrefix = process.env.API_PREFIX || 'api/v1';
-  app.setGlobalPrefix(apiPrefix);
+  app.setGlobalPrefix(apiPrefix, {
+    exclude: [
+      { path: 'api/admin', method: RequestMethod.ALL },
+      { path: 'api/admin/(.*)', method: RequestMethod.ALL },
+    ],
+  });
 
   // Validation pipe
   app.useGlobalPipes(
@@ -60,6 +65,8 @@ async function bootstrap() {
     .addTag('users', 'User management')
     .addTag('customers', 'Customer profile')
     .addTag('admin', 'Admin operations')
+    .addTag('admin-auth', 'Admin portal authentication')
+    .addTag('admin-kyc', 'Admin portal KYC review')
     .addTag('roles', 'RBAC roles & permissions')
     .addTag('kyc', 'KYC applications & verification')
     .addTag('referrals', 'Referral system')

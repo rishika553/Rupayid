@@ -103,7 +103,7 @@ export class KycController {
 
   @Patch('applications/:id/review')
   @Roles('UNDERWRITER', 'ADMIN')
-  @ApiOperation({ summary: 'Review KYC application' })
+  @ApiOperation({ summary: 'Legacy staff review; admin portal is the supported approve/decline path' })
   async review(
     @Param('id') id: string,
     @Body() data: { decision: string; reason?: string },

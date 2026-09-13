@@ -14,6 +14,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
+import { AdminKycModule } from './modules/admin-kyc/admin-kyc.module';
+import { AdminAuthGuard } from './modules/admin-auth/admin-auth.guard';
 import { RolesModule } from './modules/roles/roles.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
@@ -56,6 +59,8 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     UserModule,
     CustomersModule,
     AdminModule,
+    AdminAuthModule,
+    AdminKycModule,
     RolesModule,
     KycModule,
     ReferralsModule,
@@ -75,6 +80,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: AdminAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

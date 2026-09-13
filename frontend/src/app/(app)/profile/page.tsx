@@ -378,7 +378,7 @@ export default function ProfilePage() {
             {profile.kyc.referenceCode ? <p>Reference: {profile.kyc.referenceCode}</p> : null}
             <p>Submitted: {formatDate(profile.kyc.submittedAt)}</p>
             <p>Reviewed: {formatDate(profile.kyc.reviewedAt)}</p>
-            {profile.kyc.reason && ['REJECTED', 'RESUBMISSION_REQUIRED'].includes(profile.kyc.status) ? (
+            {profile.kyc.reason && ['REJECTED', 'DECLINED', 'RESUBMISSION_REQUIRED'].includes(profile.kyc.status) ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
                 {profile.kyc.reason}
               </p>

@@ -24,6 +24,15 @@ const DOCUMENT_PUBLIC_SELECT = {
   createdAt: true,
 } as const;
 
+const KYC_USER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  phoneNumber: true,
+  phoneVerified: true,
+  email: true,
+} as const;
+
 @Injectable()
 export class KycService {
   constructor(
@@ -88,6 +97,7 @@ export class KycService {
           },
           orderBy: { createdAt: 'asc' },
         },
+        user: { select: KYC_USER_SELECT },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -133,7 +143,7 @@ export class KycService {
       submittedAt: app.submittedAt,
       reviewedAt: app.reviewedAt,
       referenceCode: app.referenceCode,
-      reason: this.latestReviewReason(app.decisions),
+      reason: this.customerReviewReason(app.status, app.declineReason, app.decisions),
     };
   }
 
@@ -325,7 +335,7 @@ export class KycService {
         decisions: {
           select: { id: true, decision: true, reason: true, reviewedAt: true, createdAt: true },
         },
-        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        user: { select: KYC_USER_SELECT },
       },
     });
     if (!app) {
@@ -345,7 +355,7 @@ export class KycService {
       this.prisma.kycApplication.findMany({
         where,
         include: {
-          user: { select: { id: true, email: true, firstName: true, lastName: true } },
+          user: { select: KYC_USER_SELECT },
           documents: { select: DOCUMENT_PUBLIC_SELECT },
         },
         skip,
@@ -468,6 +478,17 @@ export class KycService {
     }
   }
 
+  private customerReviewReason(
+    status: string,
+    declineReason?: string | null,
+    decisions?: Array<{ decision: string; reason: string | null }>,
+  ) {
+    if (status === 'REJECTED' && declineReason?.trim()) {
+      return declineReason.trim();
+    }
+    return this.latestReviewReason(decisions);
+  }
+
   private latestReviewReason(decisions?: Array<{ decision: string; reason: string | null }>) {
     if (!decisions?.length) {
       return null;
@@ -546,12 +567,19 @@ export class KycService {
     referenceCode: string | null;
     submittedAt: Date | null;
     reviewedAt: Date | null;
+    declineReason?: string | null;
     createdAt: Date;
     updatedAt: Date;
     details: unknown;
     documents: unknown;
     decisions: unknown;
     notes?: string | null;
+    user?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      phoneNumber?: string | null;
+      phoneVerified?: boolean;
+    } | null;
   }) {
     return {
       id: app.id,
@@ -559,8 +587,15 @@ export class KycService {
       referenceCode: app.referenceCode,
       submittedAt: app.submittedAt,
       reviewedAt: app.reviewedAt,
+      declineReason: app.declineReason ?? null,
       createdAt: app.createdAt,
       updatedAt: app.updatedAt,
+      contact: {
+        phoneNumber: app.user?.phoneNumber || null,
+        phoneVerified: Boolean(app.user?.phoneVerified),
+        firstName: app.user?.firstName || null,
+        lastName: app.user?.lastName || null,
+      },
       personal: this.pickPersonal(app.details),
       address: this.pickAddress(app.details),
       identity: this.pickIdentity(app.details),

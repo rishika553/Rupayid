@@ -24,9 +24,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(
     req: Request,
-    payload: { sub: string; email: string; sid?: string; familyId?: string; typ?: string },
+    payload: {
+      sub: string;
+      email: string;
+      sid?: string;
+      familyId?: string;
+      typ?: string;
+      aud?: string;
+    },
   ) {
-    if (payload.typ === 'refresh') {
+    if (payload.typ === 'refresh' || payload.typ === 'admin' || payload.aud === 'admin') {
       throw new UnauthorizedException('Authentication required');
     }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -12,26 +12,9 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all audit logs' })
+  @ApiOperation({ summary: 'List audit logs (read-only)' })
   async findAll(@Query() pagination: PaginationDto) {
     return this.auditService.findAll(pagination.page, pagination.limit);
-  }
-
-  @Post()
-  @ApiOperation({ summary: 'Create audit log entry' })
-  async log(@Body() data: {
-    actionType: string;
-    entityType: string;
-    entityId: string;
-    eventCategory?: string;
-    changedById?: string;
-    severity?: string;
-    message?: string;
-    diffSummary?: Record<string, unknown>;
-    ipAddress?: string;
-    metadata?: Record<string, unknown>;
-  }) {
-    return this.auditService.log(data);
   }
 
   @Get('entity/:entityType/:entityId')

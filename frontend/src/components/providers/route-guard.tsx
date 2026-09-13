@@ -3,9 +3,10 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/components/providers/auth-provider';
+import { useAdminAuth } from '@/components/providers/admin-auth-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const PUBLIC_PATHS = ['/', '/login', '/verify-otp'];
+const CUSTOMER_PUBLIC_PATHS = ['/', '/login', '/verify-otp'];
 const CUSTOMER_PATHS = [
   '/dashboard',
   '/loans',
@@ -18,25 +19,30 @@ const CUSTOMER_PATHS = [
 ];
 
 export function RouteGuard({ children }: { children: ReactNode }) {
-  const { isReady, isAuthenticated, user } = useAuth();
+  const { isReady: customerReady, isAuthenticated: customerAuthenticated } = useAuth();
+  const { isReady: adminReady, isAuthenticated: adminAuthenticated } = useAdminAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const isPublic = PUBLIC_PATHS.includes(pathname);
-  const isAdminRoute = matchesRoute(pathname, '/admin');
+  const isCustomerPublic = CUSTOMER_PUBLIC_PATHS.includes(pathname);
+  const isAdminLogin = pathname === '/admin';
+  const isAdminApp = pathname.startsWith('/admin/');
   const isCustomerRoute = CUSTOMER_PATHS.some((route) => matchesRoute(pathname, route));
-  const isAdmin = user?.roles?.some(({ role }) => role.name === 'ADMIN') ?? false;
+  const isReady = customerReady && adminReady;
+
   const redirectTarget =
     !isReady
       ? null
-      : !isAuthenticated && !isPublic
-        ? '/login'
-        : isAuthenticated && isAdmin && (isCustomerRoute || pathname === '/login' || pathname === '/verify-otp')
-          ? '/admin'
-          : isAuthenticated && !isAdmin && isAdminRoute
-            ? '/dashboard'
-            : isAuthenticated && !isAdmin && (pathname === '/login' || pathname === '/verify-otp')
-              ? '/dashboard'
-              : null;
+      : !adminAuthenticated && isAdminApp
+        ? '/admin'
+        : adminAuthenticated && isAdminLogin
+          ? '/admin/dashboard'
+          : !customerAuthenticated && !isCustomerPublic && !isAdminLogin && !isAdminApp
+            ? '/login'
+            : customerAuthenticated && isCustomerRoute
+              ? null
+              : customerAuthenticated && (pathname === '/login' || pathname === '/verify-otp')
+                ? '/dashboard'
+                : null;
 
   useEffect(() => {
     if (redirectTarget) {

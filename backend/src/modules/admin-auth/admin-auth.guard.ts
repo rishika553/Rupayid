@@ -5,22 +5,18 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { isObservable, lastValueFrom } from 'rxjs';
 import type { Observable } from 'rxjs';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { isAdminApiPath } from '../http/is-admin-api-path';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
+import { isAdminApiPath } from '../../common/http/is-admin-api-path';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class AdminAuthGuard extends AuthGuard('admin-jwt') {
   constructor(private reflector: Reflector) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<{
-      headers?: { authorization?: string };
-      originalUrl?: string;
-      url?: string;
-    }>();
-    if (isAdminApiPath(request.originalUrl || request.url)) {
+    const request = context.switchToHttp().getRequest<{ originalUrl?: string; url?: string }>();
+    if (!isAdminApiPath(request.originalUrl || request.url)) {
       return true;
     }
 
@@ -28,19 +24,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getHandler(),
       context.getClass(),
     ]);
-    const hasBearer = Boolean(request.headers?.authorization);
-
-    if (isPublic && !hasBearer) {
+    if (isPublic) {
       return true;
-    }
-
-    if (isPublic && hasBearer) {
-      try {
-        const allowed = await this.resolveActivate(super.canActivate(context));
-        return allowed || true;
-      } catch {
-        return true;
-      }
     }
 
     return this.resolveActivate(super.canActivate(context));
@@ -52,13 +37,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     _info: unknown,
     context: ExecutionContext,
   ): TUser {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) {
-      return (err || !user ? null : user) as TUser;
+    const request = context.switchToHttp().getRequest<{ originalUrl?: string; url?: string }>();
+    if (!isAdminApiPath(request.originalUrl || request.url)) {
+      return user as TUser;
     }
+
     if (err || !user) {
       throw err || new UnauthorizedException('Authentication required');
     }

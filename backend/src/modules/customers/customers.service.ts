@@ -64,6 +64,7 @@ export class CustomersService {
             referenceCode: true,
             submittedAt: true,
             reviewedAt: true,
+            declineReason: true,
             details: true,
             decisions: {
               select: { decision: true, reason: true },
@@ -270,6 +271,7 @@ export class CustomersService {
       referenceCode: string | null;
       submittedAt: Date | null;
       reviewedAt: Date | null;
+      declineReason?: string | null;
       details: KycDetailsRow | null;
       decisions?: Array<{ decision: string; reason: string | null }>;
     }>;
@@ -326,9 +328,20 @@ export class CustomersService {
         submittedAt: kyc?.submittedAt || null,
         reviewedAt: kyc?.reviewedAt || null,
         referenceCode: kyc?.referenceCode || null,
-        reason: this.latestReviewReason(kyc?.decisions),
+        reason: this.customerReviewReason(kyc?.status, kyc?.declineReason, kyc?.decisions),
       },
     };
+  }
+
+  private customerReviewReason(
+    status?: string,
+    declineReason?: string | null,
+    decisions?: Array<{ decision: string; reason: string | null }>,
+  ) {
+    if (status === 'REJECTED' && declineReason?.trim()) {
+      return declineReason.trim();
+    }
+    return this.latestReviewReason(decisions);
   }
 
   private latestReviewReason(decisions?: Array<{ decision: string; reason: string | null }>) {

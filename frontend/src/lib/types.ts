@@ -184,12 +184,19 @@ export interface KycApplication {
   referenceCode?: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
+  declineReason?: string | null;
   personal?: {
     dateOfBirth?: string | null;
     gender?: string | null;
     fatherOrSpouseName?: string | null;
     maritalStatus?: string | null;
     nationality?: string | null;
+  } | null;
+  contact?: {
+    phoneNumber?: string | null;
+    phoneVerified?: boolean;
+    firstName?: string | null;
+    lastName?: string | null;
   } | null;
   address?: {
     addressLine1?: string | null;

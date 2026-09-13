@@ -30,10 +30,12 @@ export const EDITABLE_KYC_STATUSES = ['DRAFT', 'RESUBMISSION_REQUIRED'] as const
 const KYC_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: 'Not started',
   DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
-  UNDER_REVIEW: 'Under Review',
+  SUBMITTED: 'Pending',
+  UNDER_REVIEW: 'Pending',
   APPROVED: 'Approved',
-  REJECTED: 'Rejected',
+  REJECTED: 'Declined',
+  DECLINED: 'Declined',
+  PENDING: 'Pending',
   RESUBMISSION_REQUIRED: 'Resubmission Required',
 };
 
@@ -86,6 +88,9 @@ export function kycPathForStep(step: number) {
 }
 
 export function latestDecisionReason(application?: KycApplication | null): string | null {
+  if (application?.declineReason?.trim()) {
+    return application.declineReason.trim();
+  }
   const history = application?.verificationHistory || [];
   for (let i = history.length - 1; i >= 0; i -= 1) {
     const item = history[i];

@@ -9,23 +9,34 @@ function prismaStub() {
     referenceCode: 'KYC-2026-000001',
     submittedAt: null,
     reviewedAt: null,
+    declineReason: null as string | null,
     createdAt: new Date(),
     updatedAt: new Date(),
     details: null as null,
     documents: [] as Array<{ id: string }>,
     decisions: [] as Array<{ decision: string; reason: string }>,
     notes: 'secret',
+    user: {
+      id: 'user-1',
+      firstName: 'Ria',
+      lastName: 'Shah',
+      phoneNumber: '+919000000000',
+      phoneVerified: true,
+      email: 'otp.9000000000@users.rupayaid.internal',
+    },
   };
   return {
     app,
     prisma: {
       kycApplication: {
         findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
-          where.id === app.id ? { ...app, user: { id: app.userId } } : null,
+          where.id === app.id ? app : null,
         ),
         findFirst: jest.fn(async (_args?: { where: { userId?: string } }) =>
           _args?.where.userId === app.userId ? app : null,
         ),
+        findMany: jest.fn(async () => [app]),
+        count: jest.fn(async () => 1),
       },
       kycDocument: {
         findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
@@ -73,6 +84,15 @@ describe('KycService ownership', () => {
     const mine = await service.getMine('user-1');
     expect(mine).toHaveProperty('id', 'kyc-1');
     expect(mine).not.toHaveProperty('userId');
+    expect(mine.contact).toMatchObject({ phoneNumber: '+919000000000', phoneVerified: true });
+  });
+
+  it('includes the customer phone number on pending reviews for staff', async () => {
+    const stub = prismaStub();
+    stub.app.status = 'SUBMITTED';
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    const pending = await service.listPendingReviews();
+    expect(pending.data[0].user.phoneNumber).toBe('+919000000000');
   });
 
   it('forbids loading another customer KYC by id', async () => {
@@ -148,5 +168,38 @@ describe('KycService status', () => {
     expect(status.status).toBe('RESUBMISSION_REQUIRED');
     expect(status.reason).toBe('Address proof is unclear');
     expect(status.canEdit).toBe(true);
+  });
+
+  it('returns APPROVED from the database after review', async () => {
+    const stub = prismaStub();
+    stub.app.status = 'APPROVED';
+    stub.app.reviewedAt = new Date('2026-09-11T08:00:00.000Z');
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    const status = await service.getStatus('user-1');
+    expect(status).toMatchObject({
+      status: 'APPROVED',
+      canEdit: false,
+      canSubmit: false,
+      reason: null,
+    });
+  });
+
+  it('returns the admin decline reason for a rejected application', async () => {
+    const stub = prismaStub();
+    stub.app.status = 'REJECTED';
+    stub.app.declineReason = 'Aadhaar photo is unreadable';
+    stub.app.decisions = [];
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    const status = await service.getStatus('user-1');
+    expect(status.status).toBe('REJECTED');
+    expect(status.reason).toBe('Aadhaar photo is unreadable');
+    expect(status.canEdit).toBe(false);
+  });
+
+  it('forbids the customer from editing KYC after it is submitted', async () => {
+    const stub = prismaStub();
+    stub.app.status = 'SUBMITTED';
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.updateMine('user-1', {} as never)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

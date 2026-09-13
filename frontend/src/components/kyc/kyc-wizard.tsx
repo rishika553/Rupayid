@@ -79,6 +79,7 @@ export function KycWizard({
 
   const reviewRows = useMemo(
     () => [
+      ['Mobile', application.contact?.phoneNumber || '—'],
       ['Date of birth', formatDate(values.dateOfBirth)],
       ['Gender', values.gender],
       ['Father / spouse', values.fatherOrSpouseName],
@@ -96,7 +97,7 @@ export function KycWizard({
       ],
       ['Documents', String(documents.length)],
     ],
-    [documents.length, values],
+    [application.contact?.phoneNumber, documents.length, values],
   );
 
   async function persistDraft() {
@@ -216,7 +217,7 @@ export function KycWizard({
       ) : null}
       {application.status === 'REJECTED' && reason ? (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950" role="status">
-          <p className="font-medium">Rejected</p>
+          <p className="font-medium">Declined</p>
           <p className="mt-1">{reason}</p>
         </div>
       ) : null}
@@ -266,6 +267,18 @@ export function KycWizard({
           >
             {step === 1 ? (
               <div className="grid gap-4 sm:grid-cols-2">
+                <KycField
+                  label="Mobile number"
+                  htmlFor="phoneNumber"
+                  hint={application.contact?.phoneVerified ? 'Verified at sign-in' : 'From your sign-in'}
+                >
+                  <Input
+                    id="phoneNumber"
+                    value={application.contact?.phoneNumber || ''}
+                    readOnly
+                    autoComplete="tel"
+                  />
+                </KycField>
                 <KycField label="Date of birth" htmlFor="dateOfBirth" error={form.formState.errors.dateOfBirth?.message}>
                   <Input id="dateOfBirth" type="date" {...form.register('dateOfBirth')} />
                 </KycField>

@@ -39,6 +39,11 @@ enum UserStatus {
   DORMANT
 }
 
+enum AdminUserStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum KycApplicationStatus {
   NOT_SUBMITTED
   DRAFT
@@ -468,8 +473,13 @@ enum AuditLogActionType {
   KYC_CREATED
   KYC_UPDATED
   KYC_DOCUMENT_UPLOADED
+  KYC_DOCUMENT_VIEWED
+  KYC_VIEWED
   KYC_APPROVED
   KYC_REJECTED
+  KYC_DECLINED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
   PROFILE_UPDATED
   LOAN_STATUS_CHANGED
   LOAN_APPROVAL
@@ -643,18 +653,22 @@ model CustomerProfile {
 
 /// Separate table for internal admins to avoid mixing with customer identity.
 model AdminUser {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  badge        String?  @unique // work code
+  id           String          @id @default(uuid())
+  userId       String          @unique
+  username     String?         @unique
+  passwordHash String?         @map("password_hash")
+  status       AdminUserStatus @default(ACTIVE)
+  badge        String?         @unique // work code
   department   String?
-  level        Int      @default(1)
-  isSuperAdmin Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  level        Int             @default(1)
+  isSuperAdmin Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([department])
+  @@index([status])
   @@map("admin_users")
 }
 
@@ -747,8 +761,9 @@ model KycApplication {
   referenceCode String?              @unique
   submittedAt   DateTime?
   reviewedAt    DateTime?
-  reviewedBy    String? // AdminUser id or User id
+  reviewedBy    String? // staff User.id who reviewed
   notes         String? // internal reviewer notes (not customer-facing)
+  declineReason String?  @map("decline_reason") // customer-facing reject / resubmit reason
   metadata      Json?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt

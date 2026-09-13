@@ -25,7 +25,7 @@ export default function KycStatusPage() {
   const status = statusQuery.data;
   const displayStatus = status?.status || current?.status;
   const reason = status?.reason || latestDecisionReason(current);
-  const rejected = displayStatus === 'REJECTED';
+  const rejected = displayStatus === 'REJECTED' || displayStatus === 'DECLINED';
   const resubmit = displayStatus === 'RESUBMISSION_REQUIRED';
 
   if (query.isLoading || statusQuery.isLoading) {
@@ -57,7 +57,7 @@ export default function KycStatusPage() {
     <div>
       <PageHeader
         title="KYC status"
-        description="Track your verification: Draft, Submitted, Under Review, Approved, Rejected, or Resubmission Required."
+        description="Track your verification: Draft, Pending, Approved, Declined, or Resubmission Required."
         action={
           isKycEditable(displayStatus) ? (
             <Button asChild>
@@ -75,6 +75,7 @@ export default function KycStatusPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
+          <p>Mobile: {current.contact?.phoneNumber || '—'}</p>
           <p>Documents: {status.documentCount}</p>
           <p>Submitted: {formatDate(status.submittedAt)}</p>
           <p>Reviewed: {formatDate(status.reviewedAt)}</p>
@@ -87,7 +88,7 @@ export default function KycStatusPage() {
               }
               role="status"
             >
-              <p className="font-medium">{rejected ? 'Rejected' : 'Resubmission required'}</p>
+              <p className="font-medium">{rejected ? 'Declined' : 'Resubmission required'}</p>
               <p className="mt-1">{reason || 'No reason was provided. Contact support if you need help.'}</p>
             </div>
           ) : null}

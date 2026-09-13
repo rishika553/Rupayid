@@ -1,4 +1,4 @@
-import { PrismaClient, UserStatus } from '@prisma/client';
+import { AdminUserStatus, PrismaClient, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 
@@ -165,11 +165,7 @@ async function main() {
     update: {},
   });
 
-  await prisma.adminUser.upsert({
-    where: { userId: adminUser.id },
-    create: { userId: adminUser.id, badge: 'SYS-001', isSuperAdmin: true, level: 10 },
-    update: {},
-  });
+  await ensurePortalAdminUser(adminUser.id);
 
   await prisma.adminUser.upsert({
     where: { userId: underwriterUser.id },
@@ -617,6 +613,50 @@ async function main() {
 
   console.log('  ✓ Sample audit log');
   console.log('\n✅ Seeding complete!');
+}
+
+const PORTAL_ADMIN_USERNAME = 'admin';
+
+/** Idempotent Admin Portal bootstrap. Hashes the initial password; never logs it. */
+async function ensurePortalAdminUser(linkedUserId: string) {
+  const existingByUsername = await prisma.adminUser.findUnique({
+    where: { username: PORTAL_ADMIN_USERNAME },
+  });
+  if (existingByUsername) {
+    console.log('  ✓ Portal admin already exists (username=admin); skipping create');
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash('admin123', 12);
+
+  const linked = await prisma.adminUser.findUnique({ where: { userId: linkedUserId } });
+  if (linked) {
+    await prisma.adminUser.update({
+      where: { id: linked.id },
+      data: {
+        username: PORTAL_ADMIN_USERNAME,
+        passwordHash,
+        status: AdminUserStatus.ACTIVE,
+        isSuperAdmin: true,
+        level: 10,
+      },
+    });
+    console.log('  ✓ Portal admin credentials attached to existing AdminUser');
+    return;
+  }
+
+  await prisma.adminUser.create({
+    data: {
+      userId: linkedUserId,
+      username: PORTAL_ADMIN_USERNAME,
+      passwordHash,
+      status: AdminUserStatus.ACTIVE,
+      badge: 'SYS-001',
+      isSuperAdmin: true,
+      level: 10,
+    },
+  });
+  console.log('  ✓ Portal admin created (username=admin, status=ACTIVE)');
 }
 
 main()

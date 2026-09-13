@@ -39,7 +39,7 @@ export function statusTone(status?: string): 'neutral' | 'success' | 'warning' |
   if (['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'SCHEDULED', 'DRAFT', 'PROCESSING', 'RESUBMISSION_REQUIRED', 'UPCOMING', 'DUE', 'PARTIALLY_PAID'].includes(value)) {
     return 'warning';
   }
-  if (['REJECTED', 'FAILED', 'DEFAULTED', 'LOCKED', 'BANNED', 'PAST_DUE', 'OVERDUE'].includes(value)) {
+  if (['REJECTED', 'DECLINED', 'FAILED', 'DEFAULTED', 'LOCKED', 'BANNED', 'PAST_DUE', 'OVERDUE'].includes(value)) {
     return 'danger';
   }
   if (['DISBURSED', 'ELIGIBLE'].includes(value)) {
