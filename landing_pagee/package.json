@@ -1,7 +1,8 @@
 {
-  "name": "my-project",
+  "name": "rupayaid-landing",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@8.15.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
