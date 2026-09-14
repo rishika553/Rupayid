@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Bell,
-  CircleUserRound,
   CreditCard,
   FileCheck2,
   Home,
@@ -31,22 +29,18 @@ const DESKTOP_NAV = [
   { href: '/payments', label: 'Payments' },
   { href: '/kyc', label: 'KYC' },
   { href: '/referral', label: 'Referrals' },
-  { href: '/notifications', label: 'Notifications' },
-  { href: '/profile', label: 'Profile' },
 ] as const;
 
 const MOBILE_NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/loans', label: 'Loans', icon: Landmark },
   { href: '/repayments', label: 'Repayments', icon: Wallet },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
 ] as const;
 
 const MORE_NAV = [
   { href: '/payments', label: 'Payments', icon: CreditCard },
   { href: '/kyc', label: 'KYC', icon: FileCheck2 },
   { href: '/referral', label: 'Referrals', icon: Share2 },
-  { href: '/profile', label: 'Profile', icon: CircleUserRound },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -55,7 +49,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dashboard = useCustomerDashboard().data;
   const [moreOpen, setMoreOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const unreadCount = dashboard?.notifications.unreadCount ?? 0;
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`;
 
   useEffect(() => {
@@ -105,16 +98,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                   )}
                 >
                   {item.label}
-                  {item.href === '/notifications' && unreadCount > 0 ? (
-                    <NotificationBadge count={unreadCount} />
-                  ) : null}
                 </Link>
               );
             })}
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <div className="flex items-center gap-2" aria-label="Authenticated customer">
+            <Link
+              href="/profile"
+              aria-label="Open profile"
+              aria-current={pathname === '/profile' ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-2 rounded-md px-1 py-1 hover:bg-secondary',
+                pathname === '/profile' && 'bg-secondary',
+              )}
+            >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                 {initials || 'CU'}
               </span>
@@ -124,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </p>
                 <p className="text-xs text-muted-foreground">Customer</p>
               </div>
-            </div>
+            </Link>
             {dashboard?.kyc.status ? (
               <span className="hidden xl:inline-flex">
                 <Badge tone={statusTone(dashboard.kyc.status)}>
@@ -150,13 +148,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card lg:hidden" aria-label="Mobile customer">
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-4">
           {MOBILE_NAV.map((item) => (
             <MobileLink
               key={item.href}
               {...item}
               active={isActive(pathname, item.href)}
-              badge={item.href === '/notifications' ? unreadCount : 0}
             />
           ))}
           <li>
@@ -195,9 +192,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 id="more-menu-title" className="font-semibold">More</h2>
-                <p className="text-sm text-muted-foreground">
+                <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground">
                   {user?.firstName} {user?.lastName}
-                </p>
+                </Link>
               </div>
               <button
                 ref={closeButtonRef}
@@ -251,13 +248,11 @@ function MobileLink({
   label,
   icon: Icon,
   active,
-  badge,
 }: {
   href: string;
   label: string;
   icon: LucideIcon;
   active: boolean;
-  badge: number;
 }) {
   return (
     <li>
@@ -269,28 +264,10 @@ function MobileLink({
           active && 'font-medium text-primary',
         )}
       >
-        <span className="relative">
-          <Icon className="h-5 w-5" aria-hidden />
-          {badge > 0 ? <NotificationBadge count={badge} compact /> : null}
-        </span>
+        <Icon className="h-5 w-5" aria-hidden />
         {label}
       </Link>
     </li>
-  );
-}
-
-function NotificationBadge({ count, compact = false }: { count: number; compact?: boolean }) {
-  const label = count > 99 ? '99+' : String(count);
-  return (
-    <span
-      className={cn(
-        'inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-4 text-destructive-foreground',
-        compact ? 'absolute -right-3 -top-2' : 'ml-1 align-top',
-      )}
-      aria-label={`${count} unread notifications`}
-    >
-      {label}
-    </span>
   );
 }
 

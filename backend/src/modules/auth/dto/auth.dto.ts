@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, Matches } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -39,6 +39,25 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'RAP-ABCD2345' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|^RAP-[A-Za-z0-9]{8}$/i)
+  referralCode?: string;
+}
+
+export class GoogleAuthDto {
+  @ApiProperty({ description: 'Google ID token from Sign in with Google' })
+  @IsString()
+  @MinLength(20)
+  idToken!: string;
+
+  @ApiPropertyOptional({ example: 'RAP-ABCD2345' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|^RAP-[A-Za-z0-9]{8}$/i)
+  referralCode?: string;
 }
 
 export class RefreshTokenDto {

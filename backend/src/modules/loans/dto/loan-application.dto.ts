@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateLoanApplicationDto {
   @ApiProperty()
@@ -17,6 +17,7 @@ export class CreateLoanApplicationDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(60)
   tenureMonths!: number;
 
   @ApiPropertyOptional()
@@ -24,6 +25,25 @@ export class CreateLoanApplicationDto {
   @IsString()
   @MaxLength(128)
   idempotencyKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  purpose?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  employmentType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  monthlyIncome?: number;
 }
 
 export class UpdateLoanApplicationDto {
@@ -44,12 +64,32 @@ export class UpdateLoanApplicationDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(60)
   tenureMonths?: number;
 
   @ApiPropertyOptional({ enum: ['CANCELLED'] })
   @IsOptional()
   @IsIn(['CANCELLED'])
   status?: 'CANCELLED';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  purpose?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  employmentType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  monthlyIncome?: number;
 }
 
 export class SubmitLoanApplicationDto {

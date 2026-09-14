@@ -5,8 +5,8 @@ import { Public } from '../../common/decorators/public.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, AuthResponseDto } from './dto/auth.dto';
-import { RequestOtpDto, VerifyOtpDto, RefreshSessionDto } from './dto/otp-auth.dto';
+import { GoogleAuthDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import { RefreshSessionDto } from './dto/otp-auth.dto';
 import { OtpAuthService } from './otp-auth.service';
 
 @ApiTags('auth')
@@ -17,32 +17,28 @@ export class AuthController {
     private readonly otpAuthService: OtpAuthService,
   ) {}
 
-  @Post('request-otp')
+  @Post('login')
   @Public()
   @HttpCode(200)
-  @ApiOperation({ summary: 'Request a login OTP over SMS' })
-  async requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
-    return this.otpAuthService.requestOtp(dto.phone, clientIp(req), req.headers['user-agent'], {
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      name: dto.name,
-    });
+  @ApiOperation({ summary: 'Sign in with email and password' })
+  async login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.loginWithPassword(dto.email, dto.password, clientIp(req), req.headers['user-agent']);
   }
 
-  @Post('verify-otp')
+  @Post('register')
   @Public()
   @HttpCode(200)
-  @ApiOperation({ summary: 'Verify OTP and create a customer session' })
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
-    return this.otpAuthService.verifyOtp(
-      dto.phone,
-      dto.otp,
-      dto.otpRequestId,
-      clientIp(req),
-      req.headers['user-agent'],
-      dto.referralCode,
-      { firstName: dto.firstName, lastName: dto.lastName, name: dto.name },
-    );
+  @ApiOperation({ summary: 'Create a customer account' })
+  async register(@Body() dto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(dto, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Post('google')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Sign in or create an account with Google' })
+  async google(@Body() dto: GoogleAuthDto, @Req() req: Request) {
+    return this.authService.loginWithGoogle(dto, clientIp(req), req.headers['user-agent']);
   }
 
   @Post('refresh')
@@ -59,21 +55,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Invalidate the current customer session' })
   async logout(@CurrentUser() user: CurrentUserPayload) {
     return this.otpAuthService.logout(user.id, user.familyId);
-  }
-
-  @Post('login')
-  @Public()
-  @ApiOperation({ summary: 'Staff email/password login' })
-  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    const user = await this.authService.validateUser(dto.email, dto.password);
-    return this.authService.login(user);
-  }
-
-  @Post('register')
-  @Public()
-  @ApiOperation({ summary: 'Email/password registration' })
-  async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(dto);
   }
 
   @Get('me')

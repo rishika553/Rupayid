@@ -25,6 +25,10 @@ class EnvironmentVariables {
   @IsString()
   JWT_EXPIRES_IN!: string;
 
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_ID!: string;
+
   @IsString()
   CORS_ORIGIN!: string;
 

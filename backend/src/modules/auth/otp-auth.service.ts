@@ -340,6 +340,79 @@ export class OtpAuthService {
     };
   }
 
+  async issueCustomerSession(userId: string, ip: string, userAgent?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: SELECT_USER });
+    if (!user || this.isBlocked(user.status)) {
+      throw new ForbiddenException(ACCOUNT_BLOCKED);
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new ForbiddenException(ACCOUNT_BLOCKED);
+    }
+
+    const familyId = crypto.randomUUID();
+    const now = new Date();
+    const accessTtl = parseDurationToMs(this.configService.get<string>('JWT_EXPIRES_IN', '15m'));
+    const refreshTtl = parseDurationToMs(
+      this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d'),
+    );
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: now },
+    });
+
+    const accessSession = await this.prisma.session.create({
+      data: {
+        userId,
+        tokenSha256: sha256(`pending-access-${familyId}`),
+        tokenType: 'ACCESS',
+        status: 'ACTIVE',
+        ipAddress: ip,
+        userAgent: userAgent || null,
+        expiresAt: new Date(now.getTime() + accessTtl),
+        metadata: { familyId },
+      },
+    });
+    const refreshSession = await this.prisma.session.create({
+      data: {
+        userId,
+        tokenSha256: sha256(`pending-refresh-${familyId}`),
+        tokenType: 'REFRESH',
+        status: 'ACTIVE',
+        ipAddress: ip,
+        userAgent: userAgent || null,
+        expiresAt: new Date(now.getTime() + refreshTtl),
+        metadata: { familyId },
+      },
+    });
+
+    const tokens = this.signTokenPair({
+      userId,
+      email: user.email,
+      accessSessionId: accessSession.id,
+      refreshSessionId: refreshSession.id,
+      familyId,
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.session.update({
+        where: { id: accessSession.id },
+        data: { tokenSha256: sha256(tokens.accessToken), lastUsedAt: now },
+      }),
+      this.prisma.session.update({
+        where: { id: refreshSession.id },
+        data: { tokenSha256: sha256(tokens.refreshToken), lastUsedAt: now },
+      }),
+    ]);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: Math.floor(accessTtl / 1000),
+      user,
+    };
+  }
+
   async refresh(refreshToken: string, ip: string, userAgent?: string) {
     let payload: { sub: string; sid: string; familyId: string; typ: string };
     try {

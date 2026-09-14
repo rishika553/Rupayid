@@ -50,6 +50,20 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     }
   }, [redirectTarget, router]);
 
+  useEffect(() => {
+    if (!isReady || !customerAuthenticated) {
+      return;
+    }
+    const keepSessionOnBack = () => {
+      const path = window.location.pathname;
+      if (path === '/login' || path === '/verify-otp') {
+        router.replace('/dashboard');
+      }
+    };
+    window.addEventListener('popstate', keepSessionOnBack);
+    return () => window.removeEventListener('popstate', keepSessionOnBack);
+  }, [customerAuthenticated, isReady, router]);
+
   if (!isReady) {
     return (
       <div className="flex min-h-screen flex-col gap-4 p-6">

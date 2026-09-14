@@ -583,6 +583,7 @@ model User {
   id            String     @id @default(uuid())
   email         String     @unique
   emailVerified Boolean    @default(false)
+  googleId      String?    @unique @map("google_id")
   phoneNumber   String?    @unique
   phoneVerified Boolean    @default(false)
   firstName     String

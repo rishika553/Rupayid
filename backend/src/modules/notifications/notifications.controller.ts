@@ -4,7 +4,6 @@ import { NotificationsService } from './notifications.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import type { PaginationDto } from '../../common/decorators/api-paginated.decorator';
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -14,14 +13,22 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get my notifications' })
-  async myNotifications(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
-    return this.notificationsService.findByUser(user.id, pagination.page, pagination.limit);
+  async myNotifications(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationsService.findByUser(user.id, Number(page), Number(limit));
   }
 
   @Get('my')
   @ApiOperation({ summary: 'Get my notifications (legacy alias)' })
-  async myNotificationsAlias(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
-    return this.notificationsService.findByUser(user.id, pagination.page, pagination.limit);
+  async myNotificationsAlias(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationsService.findByUser(user.id, Number(page), Number(limit));
   }
 
   @Post('read-all')

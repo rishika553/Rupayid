@@ -3,9 +3,6 @@
 import Link from 'next/link';
 import {
   ArrowRight,
-  Bell,
-  CircleUserRound,
-  CreditCard,
   FileCheck2,
   Landmark,
   ReceiptIndianRupee,
@@ -63,14 +60,6 @@ export default function DashboardPage() {
       <PageHeader
         title={`Welcome, ${dashboard.customer.firstName}`}
         description="Everything that needs your attention, in one place."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/notifications">
-              <Bell className="mr-2 h-4 w-4" />
-              {dashboard.notifications.unreadCount} unread
-            </Link>
-          </Button>
-        }
       />
 
       {dashboard.kyc.actionRequired ? (
@@ -239,82 +228,20 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2">
-              <Share2 className="h-4 w-4" /> Referral
-            </CardDescription>
-            <CardTitle className="font-mono text-2xl tracking-wide">
-              {dashboard.referral.code || 'Not generated'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {dashboard.referral.referredCount} referred · {dashboard.referral.convertedCount} converted
-            {dashboard.referral.referredBy ? ` · Invited by ${dashboard.referral.referredBy}` : ''}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2">
-              <Bell className="h-4 w-4" /> Notifications
-            </CardDescription>
-            <CardTitle className="text-3xl">{dashboard.notifications.unreadCount}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Unread account and loan updates
-          </CardContent>
-        </Card>
-      </div>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Quick actions</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction href="/kyc" icon={FileCheck2} label="Complete KYC" />
-          <QuickAction href="/loans/apply" icon={ReceiptIndianRupee} label="Apply for Loan" />
-          <QuickAction
-            href={activeLoan ? `/loans/${activeLoan.id}` : '/loans'}
-            icon={Landmark}
-            label="View Loan"
-          />
-          <QuickAction
-            href={
-              activeLoan && nextInstallment
-                ? `/payments?loan=${activeLoan.id}&installment=${nextInstallment.installmentNumber}`
-                : '/repayments'
-            }
-            icon={Wallet}
-            label="Make Repayment"
-          />
-          <QuickAction href="/payments" icon={CreditCard} label="View Payments" />
-          <QuickAction href="/profile" icon={CircleUserRound} label="View Profile" />
-          <QuickAction href="/referral" icon={Share2} label="Referral" />
-          <QuickAction href="/notifications" icon={Bell} label="View Notifications" />
-        </div>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardDescription className="flex items-center gap-2">
+            <Share2 className="h-4 w-4" /> Referral
+          </CardDescription>
+          <CardTitle className="font-mono text-2xl tracking-wide">
+            {dashboard.referral.code || 'Not generated'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          {dashboard.referral.referredCount} referred · {dashboard.referral.convertedCount} converted
+          {dashboard.referral.referredBy ? ` · Invited by ${dashboard.referral.referredBy}` : ''}
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-function QuickAction({
-  href,
-  icon: Icon,
-  label,
-}: {
-  href: string;
-  icon: typeof FileCheck2;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-secondary"
-    >
-      <span className="rounded-md bg-primary/10 p-2 text-primary">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="text-sm font-medium">{label}</span>
-      <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-    </Link>
   );
 }

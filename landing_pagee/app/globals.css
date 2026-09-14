@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-mono: 'Geist Mono', monospace;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+:root {
+  color-scheme: light;
+  --background: oklch(0.985 0.008 95);
+  --foreground: oklch(0.28 0.03 235);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.28 0.03 235);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.28 0.03 235);
+  --primary: oklch(0.34 0.09 240);
+  --primary-foreground: oklch(0.985 0.008 95);
+  --secondary: oklch(0.95 0.025 170);
+  --secondary-foreground: oklch(0.34 0.09 240);
+  --muted: oklch(0.96 0.012 95);
+  --muted-foreground: oklch(0.53 0.025 235);
+  --accent: oklch(0.72 0.16 45);
+  --accent-foreground: oklch(0.28 0.055 35);
+  --border: oklch(0.89 0.02 220);
+  --input: oklch(0.88 0.02 220);
+  --ring: oklch(0.55 0.12 170);
+  --radius: 0.9rem;
+}
+
+* { @apply border-border outline-ring/50; }
+html { scroll-behavior: smooth; background: var(--background); }
+body { @apply bg-background text-foreground; font-family: 'Inter', sans-serif; }
+.font-sans { font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; }
+.font-mono { font-family: 'Geist Mono', monospace; }
+
+.hero-mesh { background: radial-gradient(circle at 72% 20%, oklch(0.92 0.07 165 / .7), transparent 28%), radial-gradient(circle at 20% 20%, oklch(0.94 0.05 75 / .65), transparent 27%), linear-gradient(180deg, oklch(0.985 0.008 95), transparent 75%); }
+.hero-card { background: linear-gradient(135deg, oklch(0.87 0.08 170), oklch(0.96 0.05 75)); }
+.lending-visual, .contact-visual { background: linear-gradient(145deg, oklch(0.34 0.09 240), oklch(0.27 0.11 210)); min-height: 390px; position: relative; overflow: hidden; }
+.lending-visual::after, .contact-visual::after { content: ''; position: absolute; width: 260px; height: 260px; right: -75px; bottom: -95px; border-radius: 999px; border: 1px solid oklch(0.8 0.1 170 / .3); box-shadow: 0 0 0 30px oklch(0.8 0.1 170 / .08), 0 0 0 60px oklch(0.8 0.1 170 / .04); }
+.motion-pulse { animation: motion-pulse 2.4s ease-in-out infinite; }
+@keyframes motion-pulse { 0%, 100% { opacity: .55; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.15); } }
+.hero-card, .lending-visual, article, form, .audience-card { will-change: transform; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

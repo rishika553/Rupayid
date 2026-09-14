@@ -94,7 +94,12 @@ export class LoansService {
           currentState: 'DRAFT',
           ipAddress: extras?.ip,
           idempotencyKey: idempotencyKey || null,
-          metadata: { costBreakdown: quotes.costBreakdown },
+          metadata: {
+            costBreakdown: quotes.costBreakdown,
+            purpose: data.purpose || null,
+            employmentType: data.employmentType || null,
+            monthlyIncome: data.monthlyIncome ?? null,
+          },
         } as never,
       });
       await tx.loanApplicationStateEvent.create({
@@ -157,6 +162,9 @@ export class LoansService {
         metadata: {
           ...asRecord(app.metadata),
           costBreakdown: quotes.costBreakdown,
+          purpose: data.purpose ?? asRecord(app.metadata).purpose ?? null,
+          employmentType: data.employmentType ?? asRecord(app.metadata).employmentType ?? null,
+          monthlyIncome: data.monthlyIncome ?? asRecord(app.metadata).monthlyIncome ?? null,
         } as never,
       },
     });
@@ -620,10 +628,8 @@ export class LoansService {
     if (amount < min || amount > max) {
       throw new BadRequestException(`Amount must be between ${min} and ${max}`);
     }
-    if (!Number.isInteger(tenure) || tenure < product.minTenureMonths || tenure > product.maxTenureMonths) {
-      throw new BadRequestException(
-        `Tenure must be between ${product.minTenureMonths} and ${product.maxTenureMonths} months`,
-      );
+    if (!Number.isInteger(tenure) || tenure < 1 || tenure > 60) {
+      throw new BadRequestException('Tenure must be a whole number of months between 1 and 60');
     }
   }
 

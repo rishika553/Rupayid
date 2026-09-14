@@ -3,32 +3,29 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiClient, requireApi } from '@/lib/api-client';
-import {
-  clearAuth,
-  clearPendingOtp,
-  readAuth,
-  writeAuth,
-  writePendingOtp,
-} from '@/lib/auth-storage';
+import { clearAuth, readAuth, writeAuth } from '@/lib/auth-storage';
 import type { CustomerUser } from '@/lib/types';
 import { useToast } from '@/components/ui/toaster';
+
+type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+  user: CustomerUser;
+};
 
 interface AuthContextValue {
   user: CustomerUser | null;
   isReady: boolean;
   isAuthenticated: boolean;
-  requestOtp: (
-    phone: string,
-    referralCode?: string,
-    displayName?: { firstName: string; lastName?: string; name?: string },
-  ) => Promise<void>;
-  verifyOtp: (
-    phone: string,
-    otp: string,
-    otpRequestId: string,
-    referralCode?: string,
-    displayName?: { firstName?: string; lastName?: string; name?: string },
-  ) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  createAccount: (input: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    referralCode?: string;
+  }) => Promise<void>;
+  signInWithGoogle: (idToken: string, referralCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -39,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [user, setUser] = useState<CustomerUser | null>(null);
   const [isReady, setIsReady] = useState(false);
+
+  const applySession = useCallback((data: AuthTokens, message: string) => {
+    writeAuth({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+    apiClient.setTokens(data);
+    setUser(data.user);
+    toast({ title: message, description: 'Welcome to RupayAid.' });
+  }, [toast]);
 
   const refreshUser = useCallback(async () => {
     const tokens = readAuth();
@@ -62,69 +66,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshUser().finally(() => setIsReady(true));
   }, [refreshUser]);
 
-  const requestOtp = useCallback(async (
-    phone: string,
-    referralCode?: string,
-    displayName?: { firstName: string; lastName?: string; name?: string },
-  ) => {
-    const data = await requireApi(
-      apiClient.post<{
-        otpRequestId: string;
-        expiresAt: string;
-        cooldownSeconds?: number;
-        message: string;
-        developmentOtp?: string;
-      }>('/auth/request-otp', {
-        phone,
-        firstName: displayName?.firstName,
-        lastName: displayName?.lastName,
-        name: displayName?.name,
-      }),
-    );
-    const cooldownUntil = data.cooldownSeconds
-      ? new Date(Date.now() + data.cooldownSeconds * 1000).toISOString()
-      : undefined;
-    writePendingOtp({
-      phone,
-      otpRequestId: data.otpRequestId,
-      expiresAt: data.expiresAt,
-      cooldownUntil,
-      referralCode: referralCode?.trim() ? referralCode.trim().toUpperCase() : undefined,
-      developmentOtp: data.developmentOtp,
-      firstName: displayName?.firstName,
-      lastName: displayName?.lastName,
-    });
-    toast({
-      title: data.developmentOtp ? 'Development OTP ready' : 'OTP sent',
-      description: data.developmentOtp
-        ? `No SMS was sent. Use ${data.developmentOtp} to continue.`
-        : 'Enter the 6-digit code to continue.',
-    });
-  }, [toast]);
-
-  const verifyOtp = useCallback(
-    async (phone: string, otp: string, otpRequestId: string, referralCode?: string, displayName?: { firstName?: string; lastName?: string; name?: string }) => {
-      const data = await requireApi(
-        apiClient.post<{ accessToken: string; refreshToken: string; user: CustomerUser }>(
-          '/auth/verify-otp',
-          {
-            phone,
-            otp,
-            otpRequestId,
-            referralCode: referralCode || undefined,
-            firstName: displayName?.firstName,
-            lastName: displayName?.lastName,
-            name: displayName?.name,
-          },
-        ),
-      );
-      writeAuth({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-      apiClient.setTokens(data);
-      clearPendingOtp();
-      setUser(data.user);
-      toast({ title: 'Signed in', description: 'Welcome to RupayAid.' });
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const data = await requireApi(apiClient.post<AuthTokens>('/auth/login', { email, password }));
+      applySession(data, 'Signed in');
     },
-    [toast],
+    [applySession],
+  );
+
+  const createAccount = useCallback(
+    async (input: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+      referralCode?: string;
+    }) => {
+      const data = await requireApi(
+        apiClient.post<AuthTokens>('/auth/register', {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          password: input.password,
+          referralCode: input.referralCode || undefined,
+        }),
+      );
+      applySession(data, 'Account created');
+    },
+    [applySession],
+  );
+
+  const signInWithGoogle = useCallback(
+    async (idToken: string, referralCode?: string) => {
+      const data = await requireApi(
+        apiClient.post<AuthTokens>('/auth/google', {
+          idToken,
+          referralCode: referralCode || undefined,
+        }),
+      );
+      applySession(data, 'Signed in');
+    },
+    [applySession],
   );
 
   const logout = useCallback(async () => {
@@ -144,12 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
-      requestOtp,
-      verifyOtp,
+      signIn,
+      createAccount,
+      signInWithGoogle,
       logout,
       refreshUser,
     }),
-    [user, isReady, requestOtp, verifyOtp, logout, refreshUser],
+    [user, isReady, signIn, createAccount, signInWithGoogle, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -162,4 +145,3 @@ export function useAuth() {
   }
   return ctx;
 }
-

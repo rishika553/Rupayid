@@ -1,20 +1,8 @@
 const TOKEN_KEY = 'rupayaid.auth';
-const PENDING_OTP_KEY = 'rupayaid.pending-otp';
 
 export interface StoredAuth {
   accessToken: string;
   refreshToken: string;
-}
-
-export interface PendingOtp {
-  phone: string;
-  otpRequestId: string;
-  expiresAt: string;
-  cooldownUntil?: string;
-  referralCode?: string;
-  developmentOtp?: string;
-  firstName?: string;
-  lastName?: string;
 }
 
 function browserStorage(kind: 'localStorage' | 'sessionStorage'): Storage | null {
@@ -55,24 +43,4 @@ export function writeAuth(tokens: StoredAuth): void {
 export function clearAuth(): void {
   browserStorage('localStorage')?.removeItem(TOKEN_KEY);
   browserStorage('sessionStorage')?.removeItem(TOKEN_KEY);
-}
-
-export function readPendingOtp(): PendingOtp | null {
-  const raw = browserStorage('sessionStorage')?.getItem(PENDING_OTP_KEY);
-  if (!raw) {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as PendingOtp;
-  } catch {
-    return null;
-  }
-}
-
-export function writePendingOtp(pending: PendingOtp): void {
-  browserStorage('sessionStorage')?.setItem(PENDING_OTP_KEY, JSON.stringify(pending));
-}
-
-export function clearPendingOtp(): void {
-  browserStorage('sessionStorage')?.removeItem(PENDING_OTP_KEY);
 }

@@ -9,6 +9,7 @@ import type {
   KycStatus,
   LoanApplication,
   LoanProduct,
+  NotificationRecord,
   PaginatedNotifications,
   PaymentRecord,
   ReferralMe,
@@ -72,8 +73,14 @@ export function useEvaluateEligibility() {
 export function useSaveLoanDraft() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { loanProductId: string; amountRequested: number; tenureMonths: number }) =>
-      requireApi(apiClient.post<LoanApplication>('/loans/applications', body)),
+    mutationFn: (body: {
+      loanProductId: string;
+      amountRequested: number;
+      tenureMonths: number;
+      purpose?: string;
+      employmentType?: string;
+      monthlyIncome?: number;
+    }) => requireApi(apiClient.post<LoanApplication>('/loans/applications', body)),
     onSuccess: (draft) => {
       void queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.setQueryData(['loans', draft.id], draft);
@@ -84,11 +91,22 @@ export function useSaveLoanDraft() {
 export function useUpdateLoanDraft() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; amountRequested: number; tenureMonths: number; loanProductId?: string }) =>
+    mutationFn: (input: {
+      id: string;
+      amountRequested: number;
+      tenureMonths: number;
+      loanProductId?: string;
+      purpose?: string;
+      employmentType?: string;
+      monthlyIncome?: number;
+    }) =>
       requireApi(apiClient.patch<LoanApplication>(`/loans/applications/${input.id}`, {
         amountRequested: input.amountRequested,
         tenureMonths: input.tenureMonths,
         loanProductId: input.loanProductId,
+        purpose: input.purpose,
+        employmentType: input.employmentType,
+        monthlyIncome: input.monthlyIncome,
       })),
     onSuccess: (draft) => {
       void queryClient.invalidateQueries({ queryKey: ['loans'] });
@@ -227,7 +245,10 @@ export function useSchedule(loanId?: string) {
 export function useMyPayments() {
   return useQuery({
     queryKey: ['payments', 'me'],
-    queryFn: () => requireApi(apiClient.get<PaymentRecord[]>('/payments/me')),
+    queryFn: async () => {
+      const payload = await requireApi(apiClient.get<PaymentRecord[] | { data: PaymentRecord[] }>('/payments/me'));
+      return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+    },
   });
 }
 
@@ -258,7 +279,30 @@ export function useCreateRepaymentPayment() {
 export function useMyNotifications() {
   return useQuery({
     queryKey: ['notifications', 'me'],
-    queryFn: () => requireApi(apiClient.get<PaginatedNotifications>('/notifications')),
+    queryFn: async (): Promise<PaginatedNotifications> => {
+      const payload = await requireApi(
+        apiClient.get<PaginatedNotifications | NotificationRecord[]>('/notifications'),
+      );
+      if (Array.isArray(payload)) {
+        return {
+          data: payload,
+          unreadCount: 0,
+          total: payload.length,
+          page: 1,
+          limit: payload.length,
+          totalPages: 1,
+        };
+      }
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      return {
+        data: rows,
+        unreadCount: Number(payload?.unreadCount) || 0,
+        total: Number(payload?.total) || rows.length,
+        page: Number(payload?.page) || 1,
+        limit: Number(payload?.limit) || rows.length || 20,
+        totalPages: Number(payload?.totalPages) || 1,
+      };
+    },
   });
 }
 

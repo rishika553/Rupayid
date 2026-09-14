@@ -5,13 +5,12 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } fro
 import { Badge, statusTone } from '@/components/ui/badge';
 import { EmptyState, ErrorState, PageHeader } from '@/components/ui/feedback';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLoanProducts, useMyTrackedLoans } from '@/hooks/use-customer-data';
+import { useMyTrackedLoans } from '@/hooks/use-customer-data';
 import { formatDate, formatInr, statusLabel } from '@/lib/format';
 
 export default function LoansPage() {
   const loansQuery = useMyTrackedLoans();
-  const productsQuery = useLoanProducts();
-  const loans = loansQuery.data || [];
+  const loans = Array.isArray(loansQuery.data) ? loansQuery.data : [];
 
   if (loansQuery.isLoading) {
     return (
@@ -33,7 +32,7 @@ export default function LoansPage() {
         description="Track status, outstanding balance, and the next repayment."
         action={
           <Button asChild>
-            <Link href="/loans/apply">Apply</Link>
+            <Link href="/loans/apply">Apply for loan</Link>
           </Button>
         }
       />
@@ -41,9 +40,7 @@ export default function LoansPage() {
       {loans.length === 0 ? (
         <EmptyState
           title="No loans yet"
-          description="Start an application to track it here."
-          actionHref="/loans/apply"
-          actionLabel="Browse products"
+          description="Apply for a loan and track it here."
         />
       ) : (
         <ul className="space-y-3">
@@ -52,9 +49,9 @@ export default function LoansPage() {
               <Card>
                 <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <CardTitle className="text-lg">{loan.loanProduct?.name || loan.applicationNumber}</CardTitle>
+                    <CardTitle className="text-lg">{loan.applicationNumber}</CardTitle>
                     <CardDescription>
-                      {loan.applicationNumber} · {formatInr(loan.approvedAmount)} · {loan.tenureMonths} months
+                      {formatInr(loan.approvedAmount || loan.requestedAmount || loan.outstandingAmount)} · {loan.tenureMonths} months
                     </CardDescription>
                   </div>
                   <Badge tone={statusTone(loan.status)}>{statusLabel(loan.status)}</Badge>
@@ -76,15 +73,6 @@ export default function LoansPage() {
           ))}
         </ul>
       )}
-
-      {!productsQuery.isLoading && (productsQuery.data || []).length > 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">
-          Looking for a new product?{' '}
-          <Link className="text-primary underline-offset-4 hover:underline" href="/loans/apply">
-            Compare and apply
-          </Link>
-        </p>
-      ) : null}
     </div>
   );
 }
