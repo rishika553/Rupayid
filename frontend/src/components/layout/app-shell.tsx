@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Bell,
   CreditCard,
   FileCheck2,
   Home,
@@ -29,6 +30,7 @@ const DESKTOP_NAV = [
   { href: '/payments', label: 'Payments' },
   { href: '/kyc', label: 'KYC' },
   { href: '/referral', label: 'Referrals' },
+  { href: '/notifications', label: 'Alerts' },
 ] as const;
 
 const MOBILE_NAV = [
@@ -41,6 +43,7 @@ const MORE_NAV = [
   { href: '/payments', label: 'Payments', icon: CreditCard },
   { href: '/kyc', label: 'KYC', icon: FileCheck2 },
   { href: '/referral', label: 'Referrals', icon: Share2 },
+  { href: '/notifications', label: 'Alerts', icon: Bell },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -104,6 +107,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Link
+              href="/notifications"
+              aria-label="Notifications"
+              className={cn(
+                'relative hidden rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground sm:inline-flex',
+                pathname === '/notifications' && 'bg-secondary text-foreground',
+              )}
+            >
+              <Bell className="h-5 w-5" />
+              {(dashboard?.notifications.unreadCount || 0) > 0 ? (
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
+              ) : null}
+            </Link>
             <Link
               href="/profile"
               aria-label="Open profile"

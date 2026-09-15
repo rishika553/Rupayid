@@ -8,6 +8,7 @@ import { sealVariables } from './notification-payload.crypto';
 
 export type CustomerNotificationEvent =
   | 'OTP'
+  | 'PASSWORD_RESET'
   | 'KYC_SUBMITTED'
   | 'KYC_APPROVED'
   | 'KYC_REJECTED'
@@ -30,6 +31,7 @@ type PublishInput = {
 
 const ROUTES: Record<CustomerNotificationEvent, Array<'INAPP' | 'SMS' | 'EMAIL'>> = {
   OTP: ['SMS'],
+  PASSWORD_RESET: ['EMAIL'],
   KYC_SUBMITTED: ['INAPP', 'EMAIL'],
   KYC_APPROVED: ['INAPP', 'EMAIL', 'SMS'],
   KYC_REJECTED: ['INAPP', 'EMAIL', 'SMS'],
@@ -44,6 +46,10 @@ const ROUTES: Record<CustomerNotificationEvent, Array<'INAPP' | 'SMS' | 'EMAIL'>
 
 const COPY: Record<CustomerNotificationEvent, { title: string; body: string }> = {
   OTP: { title: 'Your RupayAid OTP', body: 'Your OTP is {{otp}}. It expires shortly.' },
+  PASSWORD_RESET: {
+    title: 'Reset your RupayAid password',
+    body: 'Use this link to choose a new password. It expires in one hour: {{resetUrl}}',
+  },
   KYC_SUBMITTED: { title: 'KYC submitted', body: 'Your KYC application {{reference}} is under review.' },
   KYC_APPROVED: { title: 'KYC approved', body: 'Your KYC verification has been approved.' },
   KYC_REJECTED: { title: 'KYC needs attention', body: 'Your KYC was rejected. {{reason}}' },

@@ -16,6 +16,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AdminKycModule } from './modules/admin-kyc/admin-kyc.module';
+import { AdminOpsModule } from './modules/admin-ops/admin-ops.module';
 import { AdminAuthGuard } from './modules/admin-auth/admin-auth.guard';
 import { RolesModule } from './modules/roles/roles.module';
 import { KycModule } from './modules/kyc/kyc.module';
@@ -61,6 +62,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     AdminModule,
     AdminAuthModule,
     AdminKycModule,
+    AdminOpsModule,
     RolesModule,
     KycModule,
     ReferralsModule,

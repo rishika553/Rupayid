@@ -5,7 +5,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
-import { GoogleAuthDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import { ForgotPasswordDto, GoogleAuthDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
 import { RefreshSessionDto } from './dto/otp-auth.dto';
 import { OtpAuthService } from './otp-auth.service';
 
@@ -39,6 +39,22 @@ export class AuthController {
   @ApiOperation({ summary: 'Sign in or create an account with Google' })
   async google(@Body() dto: GoogleAuthDto, @Req() req: Request) {
     return this.authService.loginWithGoogle(dto, clientIp(req), req.headers['user-agent']);
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Email a password reset link if the account exists' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(dto.email);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Set a new password using a reset token' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
   }
 
   @Post('refresh')

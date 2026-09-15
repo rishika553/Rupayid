@@ -58,9 +58,20 @@ export default function LoanTrackingPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Tenure</CardDescription>
-            <CardTitle className="text-xl">{loan.tenureMonths} months</CardTitle>
+            <CardDescription>Disbursement</CardDescription>
+            <CardTitle className="text-xl">
+              {loan.disbursementDate
+                ? formatInr(loan.disbursementAmount || loan.approvedAmount)
+                : loan.disbursementStatus
+                  ? statusLabel(loan.disbursementStatus)
+                  : 'Not disbursed'}
+            </CardTitle>
           </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {loan.disbursementDate ? `Sent ${formatDate(loan.disbursementDate)}` : 'Funds appear here after approval and payout.'}
+            {loan.disbursementReference ? ` · Ref ${loan.disbursementReference}` : ''}
+            {loan.disbursementAccount ? ` · A/c ${loan.disbursementAccount}` : ''}
+          </CardContent>
         </Card>
       </div>
 

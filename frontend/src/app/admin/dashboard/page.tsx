@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@rupayaid/ui';
@@ -7,39 +8,33 @@ import { Badge, statusTone } from '@/components/ui/badge';
 import { EmptyState, ErrorState, PageHeader } from '@/components/ui/feedback';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminApiClient, requireAdminApi } from '@/lib/admin-api-client';
-import type { AdminKycListItem, AdminKycStats } from '@/lib/admin-api-client';
+import type { AdminDashboardStats, AdminKycListItem, AdminLoanListItem } from '@/lib/admin-api-client';
 import { formatDateTime, statusLabel } from '@/lib/format';
 
 function kycStatusLabel(status: string) {
-  if (status === 'REJECTED') {
-    return 'Declined';
-  }
-  if (status === 'SUBMITTED' || status === 'UNDER_REVIEW') {
-    return 'Pending review';
-  }
+  if (status === 'REJECTED') return 'Declined';
+  if (status === 'SUBMITTED' || status === 'UNDER_REVIEW') return 'Pending review';
   return statusLabel(status);
-}
-
-function kycStatusTone(status: string) {
-  if (status === 'REJECTED') {
-    return 'danger' as const;
-  }
-  return statusTone(status);
 }
 
 export default function AdminDashboardPage() {
   const statsQuery = useQuery({
-    queryKey: ['admin', 'kyc', 'stats'],
+    queryKey: ['admin', 'dashboard', 'stats'],
     queryFn: () => requireAdminApi(adminApiClient.kycStats()),
     staleTime: 15_000,
   });
-  const recentQuery = useQuery({
+  const recentKycQuery = useQuery({
     queryKey: ['admin', 'kyc', 'recent'],
-    queryFn: () => requireAdminApi(adminApiClient.kycList({ limit: 8 })),
+    queryFn: () => requireAdminApi(adminApiClient.kycList({ limit: 5 })),
+    staleTime: 15_000,
+  });
+  const recentLoansQuery = useQuery({
+    queryKey: ['admin', 'loans', 'recent'],
+    queryFn: () => requireAdminApi(adminApiClient.loanList({ limit: 5, status: 'PENDING' })),
     staleTime: 15_000,
   });
 
-  if (statsQuery.isLoading || recentQuery.isLoading) {
+  if (statsQuery.isLoading || recentKycQuery.isLoading || recentLoansQuery.isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-48" />
@@ -54,40 +49,47 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (statsQuery.isError || recentQuery.isError || !statsQuery.data || !recentQuery.data) {
+  if (statsQuery.isError || recentKycQuery.isError || recentLoansQuery.isError || !statsQuery.data) {
     return (
       <ErrorState
-        message="Unable to load KYC dashboard."
+        message="Unable to load the admin dashboard."
         onRetry={() => {
           void statsQuery.refetch();
-          void recentQuery.refetch();
+          void recentKycQuery.refetch();
+          void recentLoansQuery.refetch();
         }}
       />
     );
   }
 
-  return <DashboardBody stats={statsQuery.data} recent={recentQuery.data.data} />;
+  return (
+    <DashboardBody
+      stats={statsQuery.data}
+      recentKyc={recentKycQuery.data?.data || []}
+      recentLoans={recentLoansQuery.data?.data || []}
+    />
+  );
 }
 
-function DashboardBody({ stats, recent }: { stats: AdminKycStats; recent: AdminKycListItem[] }) {
+function DashboardBody({
+  stats,
+  recentKyc,
+  recentLoans,
+}: {
+  stats: AdminDashboardStats;
+  recentKyc: AdminKycListItem[];
+  recentLoans: AdminLoanListItem[];
+}) {
   const cards = [
-    { label: 'Total KYC Applications', value: stats.total },
-    { label: 'Pending Review', value: stats.pendingReview },
-    { label: 'Approved', value: stats.approved },
-    { label: 'Declined', value: stats.declined },
+    { label: 'KYC pending', value: stats.pendingReview },
+    { label: 'Loans pending', value: stats.loans?.pendingReview ?? 0 },
+    { label: 'Payouts pending', value: stats.disbursements?.pending ?? 0 },
+    { label: 'Overdue EMIs', value: stats.overdueCount ?? 0 },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description="Phase 1 KYC review"
-        action={
-          <Button asChild>
-            <Link href="/admin/kyc">View All KYC Applications</Link>
-          </Button>
-        }
-      />
+      <PageHeader title="Dashboard" description="KYC, loans, disbursements, and overdue repayments" />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
@@ -103,45 +105,87 @@ function DashboardBody({ stats, recent }: { stats: AdminKycStats; recent: AdminK
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Recent KYC Applications</h2>
-        {recent.length === 0 ? (
-          <EmptyState
-            title="No submitted applications"
-            description="Submitted KYC applications will appear here for review."
-          />
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Loan applications to review</h2>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/loans">View all</Link>
+          </Button>
+        </div>
+        {recentLoans.length === 0 ? (
+          <EmptyState title="No pending loans" description="Submitted loan applications will appear here." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Customer Name</th>
-                  <th className="px-4 py-3 font-medium">Mobile</th>
-                  <th className="px-4 py-3 font-medium">Submitted At</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((row) => (
-                  <tr key={row.id} className="border-b last:border-0">
-                    <td className="px-4 py-3 font-medium text-foreground">{row.customerName}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{row.mobile || '—'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(row.submittedAt)}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={kycStatusTone(row.status)}>{kycStatusLabel(row.status)}</Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/admin/kyc/${row.id}`}>View</Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminTable
+            headers={['Customer', 'Application', 'Amount', 'Status', '']}
+            rows={recentLoans.map((row) => [
+              row.customerName,
+              row.applicationNumber,
+              row.amountRequested,
+              <Badge key={row.id} tone={statusTone(row.status)}>
+                {statusLabel(row.status)}
+              </Badge>,
+              <Button key={`${row.id}-a`} asChild variant="outline" size="sm">
+                <Link href={`/admin/loans/${row.id}`}>Review</Link>
+              </Button>,
+            ])}
+          />
         )}
       </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Recent KYC</h2>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/kyc">View all</Link>
+          </Button>
+        </div>
+        {recentKyc.length === 0 ? (
+          <EmptyState title="No submitted applications" description="Submitted KYC applications will appear here." />
+        ) : (
+          <AdminTable
+            headers={['Customer', 'Mobile', 'Submitted', 'Status', '']}
+            rows={recentKyc.map((row) => [
+              row.customerName,
+              row.mobile || '—',
+              formatDateTime(row.submittedAt),
+              <Badge key={row.id} tone={statusTone(row.status)}>
+                {kycStatusLabel(row.status)}
+              </Badge>,
+              <Button key={`${row.id}-a`} asChild variant="outline" size="sm">
+                <Link href={`/admin/kyc/${row.id}`}>View</Link>
+              </Button>,
+            ])}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function AdminTable({ headers, rows }: { headers: string[]; rows: Array<Array<ReactNode>> }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="border-b bg-muted/40 text-muted-foreground">
+          <tr>
+            {headers.map((header) => (
+              <th key={header || 'action'} className="px-4 py-3 font-medium">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((cells, index) => (
+            <tr key={index} className="border-b last:border-0">
+              {cells.map((cell, cellIndex) => (
+                <td key={cellIndex} className="px-4 py-3">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { Button } from '@rupayaid/ui';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState, ErrorState, PageHeader } from '@/components/ui/feedback';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMarkNotificationRead, useMyNotifications } from '@/hooks/use-customer-data';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications } from '@/hooks/use-customer-data';
 import { formatDateTime, statusLabel } from '@/lib/format';
 import { useToast } from '@/components/ui/toaster';
 import { cn } from '@rupayaid/ui';
@@ -13,6 +13,7 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const query = useMyNotifications();
   const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
 
   if (query.isLoading) {
     return (
@@ -33,6 +34,28 @@ export default function NotificationsPage() {
       <PageHeader
         title="Notifications"
         description="Account, KYC, loan, and repayment updates."
+        action={
+          items.some((item) => !item.isRead) ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={markAll.isPending}
+              onClick={() => {
+                void markAll.mutateAsync().then(
+                  () => toast({ title: 'All notifications marked as read' }),
+                  (error: unknown) =>
+                    toast({
+                      title: 'Could not update',
+                      description: error instanceof Error ? error.message : 'Try again',
+                      variant: 'destructive',
+                    }),
+                );
+              }}
+            >
+              Mark all read
+            </Button>
+          ) : undefined
+        }
       />
       {items.length === 0 ? (
         <EmptyState title="No notifications" description="You will see EMI reminders and status updates here." />

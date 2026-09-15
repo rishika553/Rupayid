@@ -7,6 +7,9 @@ const SKIP_BEARER = new Set([
   '/auth/login',
   '/auth/register',
   '/auth/google',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/health/contact',
 ]);
 
 function errorMessage(payload: unknown): string {

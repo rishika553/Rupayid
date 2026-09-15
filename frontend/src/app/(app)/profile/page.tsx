@@ -256,7 +256,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Contact information</CardTitle>
-            <CardDescription>Mobile is verified by OTP and cannot be changed here.</CardDescription>
+            <CardDescription>Email can be updated here. Mobile is taken from your account.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <KycField label="Mobile" htmlFor="phone" hint={profile.contact.phoneVerified ? 'Verified' : 'Not verified'}>

@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { useAdminAuth } from '@/components/providers/admin-auth-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const CUSTOMER_PUBLIC_PATHS = ['/', '/login', '/verify-otp'];
+const CUSTOMER_PUBLIC_PATHS = ['/', '/login', '/verify-otp', '/forgot-password', '/reset-password'];
 const CUSTOMER_PATHS = [
   '/dashboard',
   '/loans',
@@ -23,7 +23,8 @@ export function RouteGuard({ children }: { children: ReactNode }) {
   const { isReady: adminReady, isAuthenticated: adminAuthenticated } = useAdminAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const isCustomerPublic = CUSTOMER_PUBLIC_PATHS.includes(pathname);
+  const isCustomerPublic =
+    CUSTOMER_PUBLIC_PATHS.includes(pathname) || pathname.startsWith('/legal');
   const isAdminLogin = pathname === '/admin';
   const isAdminApp = pathname.startsWith('/admin/');
   const isCustomerRoute = CUSTOMER_PATHS.some((route) => matchesRoute(pathname, route));

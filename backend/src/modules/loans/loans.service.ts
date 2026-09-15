@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateLoanApplicationDto, UpdateLoanApplicationDto } from './dto/loan-application.dto';
 import {
   assertTransition,
+  canTransition,
   OPEN_STATES,
 } from './loan-application.state';
 import { summarizeSchedule } from './repayment-schedule';
@@ -418,7 +419,11 @@ export class LoansService {
     approvedByName: string;
   }) {
     const app = await this.findById(id);
-    assertTransition(app.currentState, 'APPROVED', 'workflow');
+    try {
+      assertTransition(app.currentState, 'APPROVED', 'workflow');
+    } catch {
+      throw new BadRequestException(`Cannot approve application from ${app.currentState}`);
+    }
 
     const [approval] = await this.prisma.$transaction([
       this.prisma.loanApproval.create({
@@ -473,7 +478,11 @@ export class LoansService {
 
   async reject(id: string, data: { reason: string; rejectedById: string }) {
     const app = await this.findById(id);
-    assertTransition(app.currentState, 'REJECTED', 'workflow');
+    try {
+      assertTransition(app.currentState, 'REJECTED', 'workflow');
+    } catch {
+      throw new BadRequestException(`Cannot reject application from ${app.currentState}`);
+    }
 
     const [approval] = await this.prisma.$transaction([
       this.prisma.loanApproval.create({
@@ -517,6 +526,41 @@ export class LoansService {
     });
 
     return approval;
+  }
+
+  async ensureRepaymentSchedule(loanApplicationId: string) {
+    const app = await this.findById(loanApplicationId);
+    if (app.repaymentSchedule.length > 0) {
+      return app.repaymentSchedule;
+    }
+    const approval = app.approvals.find((row) => row.decision === 'APPROVED');
+    const principal = new Prisma.Decimal(String(approval?.approvedAmount ?? app.amountRequested));
+    const tenure = approval?.approvedTenure ?? app.tenureMonths;
+    const annual = new Prisma.Decimal(String(approval?.approvedInterest ?? app.interestRate));
+    const rows = buildEqualInstallments(principal, annual, tenure, new Date());
+    await this.prisma.repaymentSchedule.createMany({
+      data: rows.map((row) => ({
+        loanApplicationId,
+        sequence: row.sequence,
+        dueDate: row.dueDate,
+        principalPortion: row.principal,
+        interestPortion: row.interest,
+        totalAmount: row.total,
+      })),
+    });
+    return this.findById(loanApplicationId).then((next) => next.repaymentSchedule);
+  }
+
+  async activateAfterDisbursement(id: string, actorId: string) {
+    await this.ensureRepaymentSchedule(id);
+    let app = await this.findById(id);
+    for (const toState of ['DISBURSEMENT_PENDING', 'DISBURSED', 'ACTIVE'] as const) {
+      if (canTransition(app.currentState, toState, 'workflow')) {
+        await this.transitionOwned(app, toState, actorId, 'workflow', 'Disbursement completed');
+        app = await this.findById(id);
+      }
+    }
+    return app;
   }
 
   private async transitionOwned(
@@ -783,7 +827,14 @@ export class LoansService {
       approvedTenure: number | null;
       approvedAt: Date;
     }>;
-    disbursements?: Array<{ status: string; successAt: Date | null; amount: Prisma.Decimal | string | number }>;
+    disbursements?: Array<{
+      status: string;
+      successAt: Date | null;
+      amount: Prisma.Decimal | string | number;
+      txRef?: string | null;
+      providerReference?: string | null;
+      beneficiaryAccount?: string | null;
+    }>;
     repaymentSchedule?: Array<{
       id: string;
       sequence: number;
@@ -810,6 +861,7 @@ export class LoansService {
   }) {
     const approval = (app.approvals || []).find((row) => row.decision === 'APPROVED') || app.approvals?.[0];
     const disbursed = (app.disbursements || []).find((row) => row.status === 'SUCCESS' && row.successAt);
+    const latestDisbursement = (app.disbursements || [])[0];
     const schedule = app.repaymentSchedule || [];
     const summary = summarizeSchedule(schedule);
     const approvedAmount = approval?.approvedAmount ?? app.amountRequested;
@@ -829,6 +881,10 @@ export class LoansService {
       applicationDate: app.submittedAt || app.createdAt,
       approvalDate: approval?.approvedAt || null,
       disbursementDate: disbursed?.successAt || null,
+      disbursementStatus: latestDisbursement?.status || null,
+      disbursementAmount: latestDisbursement ? String(latestDisbursement.amount) : null,
+      disbursementReference: latestDisbursement?.txRef || latestDisbursement?.providerReference || null,
+      disbursementAccount: latestDisbursement?.beneficiaryAccount || null,
       outstandingAmount: summary.totals.outstanding,
       nextRepayment: summary.nextPayment
         ? {
@@ -871,7 +927,14 @@ const TRACKING_INCLUDE = {
   },
   disbursements: {
     orderBy: { createdAt: 'desc' as const },
-    select: { amount: true, status: true, successAt: true },
+    select: {
+      amount: true,
+      status: true,
+      successAt: true,
+      txRef: true,
+      providerReference: true,
+      beneficiaryAccount: true,
+    },
   },
   repaymentSchedule: { orderBy: { sequence: 'asc' as const } },
   payments: {
@@ -892,5 +955,39 @@ const TRACKING_INCLUDE = {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+function buildEqualInstallments(
+  principal: Prisma.Decimal,
+  annualRate: Prisma.Decimal,
+  tenureMonths: number,
+  start: Date,
+) {
+  const n = Math.max(1, tenureMonths);
+  const yearly = annualRate.lte(1) ? annualRate : annualRate.div(100);
+  const monthlyRate = yearly.div(12);
+  let emi: Prisma.Decimal;
+  if (monthlyRate.eq(0)) {
+    emi = principal.div(n).toDecimalPlaces(2);
+  } else {
+    const factor = monthlyRate.plus(1).pow(n);
+    emi = principal.mul(monthlyRate).mul(factor).div(factor.minus(1)).toDecimalPlaces(2);
+  }
+
+  const rows: Array<{ sequence: number; dueDate: Date; principal: Prisma.Decimal; interest: Prisma.Decimal; total: Prisma.Decimal }> =
+    [];
+  let remaining = principal;
+  for (let i = 1; i <= n; i += 1) {
+    const dueDate = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, start.getUTCDate()));
+    const interest = remaining.mul(monthlyRate).toDecimalPlaces(2);
+    let principalPortion = emi.minus(interest).toDecimalPlaces(2);
+    if (i === n || principalPortion.gt(remaining)) {
+      principalPortion = remaining.toDecimalPlaces(2);
+    }
+    const total = principalPortion.plus(interest).toDecimalPlaces(2);
+    remaining = remaining.minus(principalPortion);
+    rows.push({ sequence: i, dueDate, principal: principalPortion, interest, total });
+  }
+  return rows;
 }
 

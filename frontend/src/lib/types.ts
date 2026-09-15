@@ -264,6 +264,10 @@ export interface CustomerLoan {
   applicationDate: string;
   approvalDate?: string | null;
   disbursementDate?: string | null;
+  disbursementStatus?: string | null;
+  disbursementAmount?: string | null;
+  disbursementReference?: string | null;
+  disbursementAccount?: string | null;
   outstandingAmount: string;
   nextRepayment?: {
     dueDate: string;

@@ -60,6 +60,25 @@ export class GoogleAuthDto {
   referralCode?: string;
 }
 
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(20)
+  token!: string;
+
+  @ApiProperty({ example: 'StrongP@ssw0rd' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+}
+
 export class RefreshTokenDto {
   @ApiProperty()
   @IsString()

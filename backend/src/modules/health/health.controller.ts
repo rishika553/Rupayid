@@ -1,11 +1,34 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Logger, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { Public } from '../../common/decorators/public.decorator';
+
+class ContactDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subject?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  message!: string;
+}
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
@@ -43,5 +66,16 @@ export class HealthController {
     } catch {
       return { status: 'not ready' };
     }
+  }
+
+  @Post('contact')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Public contact form' })
+  async contact(@Body() dto: ContactDto) {
+    this.logger.log(
+      `Contact form from ${dto.name} <${dto.email}> — ${dto.subject || 'Website enquiry'}: ${dto.message.slice(0, 240)}`,
+    );
+    return { message: 'Thanks. Our team will get back to you.' };
   }
 }

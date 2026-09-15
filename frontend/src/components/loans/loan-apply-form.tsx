@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -11,13 +11,16 @@ import { ErrorState } from '@/components/ui/feedback';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toaster';
 import {
+  useEvaluateEligibility,
   useLoanProducts,
   useMyLoans,
   useSaveLoanDraft,
   useSubmitLoanApplication,
   useUpdateLoanDraft,
 } from '@/hooks/use-customer-data';
+import { EligibilityResultCard } from '@/components/loans/eligibility-result';
 import { formatInr } from '@/lib/format';
+import type { EligibilityResult } from '@/lib/types';
 
 const PURPOSES = ['Personal', 'Medical', 'Education', 'Home', 'Business', 'Vehicle', 'Other'] as const;
 const EMPLOYMENT = ['Salaried', 'Self-employed', 'Business owner', 'Student', 'Other'] as const;
@@ -44,8 +47,11 @@ export function LoanApplyForm() {
   const saveDraft = useSaveLoanDraft();
   const updateDraft = useUpdateLoanDraft();
   const submitLoan = useSubmitLoanApplication();
+  const evaluateEligibility = useEvaluateEligibility();
   const products = Array.isArray(productsQuery.data) ? productsQuery.data : [];
   const existingDraft = (loansQuery.data || []).find((row) => row.status === 'DRAFT');
+  const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -81,6 +87,45 @@ export function LoanApplyForm() {
     });
   }, [existingDraft?.id, existingDraft?.amountRequested, existingDraft?.tenureMonths, form]);
 
+  const watchedAmount = form.watch('amountRequested');
+  const selectedProduct = useMemo(() => {
+    if (!products.length) {
+      return undefined;
+    }
+    if (!watchedAmount) {
+      return products[0];
+    }
+    return (
+      products
+        .filter((row) => watchedAmount >= Number(row.minAmount) && watchedAmount <= Number(row.maxAmount))
+        .sort((a, b) => Number(b.maxAmount) - Number(a.maxAmount))[0] || products[0]
+    );
+  }, [products, watchedAmount]);
+
+  useEffect(() => {
+    if (!selectedProduct) {
+      return;
+    }
+    let cancelled = false;
+    void evaluateEligibility.mutateAsync(selectedProduct.id).then(
+      (result) => {
+        if (!cancelled) {
+          setEligibility(result);
+          setEligibilityError(null);
+        }
+      },
+      (error: unknown) => {
+        if (!cancelled) {
+          setEligibility(null);
+          setEligibilityError(error instanceof Error ? error.message : 'Could not check eligibility');
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProduct?.id]);
+
   async function onSubmit(values: FormValues) {
     if (!products.length || !limits) {
       return;
@@ -100,6 +145,14 @@ export function LoanApplyForm() {
     if (!product) {
       form.setError('amountRequested', {
         message: `Enter an amount between ${formatInr(limits.minAmount)} and ${formatInr(limits.maxAmount)}`,
+      });
+      return;
+    }
+    if (eligibility && !eligibility.eligible) {
+      toast({
+        title: 'Not eligible yet',
+        description: eligibility.reason || 'Complete KYC and profile details, then try again.',
+        variant: 'destructive',
       });
       return;
     }
@@ -245,11 +298,17 @@ export function LoanApplyForm() {
             ) : null}
           </div>
 
+          <EligibilityResultCard
+            result={eligibility}
+            loading={evaluateEligibility.isPending && !eligibility}
+            error={eligibilityError}
+          />
+
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => router.push('/loans')}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || (Boolean(eligibility) && !eligibility?.eligible)}>
               {pending ? 'Submitting…' : 'Submit application'}
             </Button>
           </div>

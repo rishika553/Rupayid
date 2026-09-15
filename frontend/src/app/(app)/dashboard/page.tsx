@@ -152,6 +152,20 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {dashboard.notifications.unreadCount > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">You have {dashboard.notifications.unreadCount} unread alerts</p>
+              <p className="text-sm text-muted-foreground">KYC, loan, and repayment updates live in Notifications.</p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/notifications">Open alerts</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>

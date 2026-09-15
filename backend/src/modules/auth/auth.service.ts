@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -10,16 +12,21 @@ import * as crypto from 'crypto';
 import { UserService } from '../user/user.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { OtpAuthService } from './otp-auth.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { verifyGoogleIdToken } from './google-id-token';
+import { sha256 } from './crypto.util';
 import type { GoogleAuthDto, RegisterDto } from './dto/auth.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly referrals: ReferralsService,
     private readonly sessions: OtpAuthService,
+    private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {}
@@ -120,5 +127,75 @@ export class AuthService {
 
   async getProfile(userId: string) {
     return this.userService.findById(userId);
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = await this.userService.findByEmail(email.trim().toLowerCase());
+    if (user?.passwordHash) {
+      await this.prisma.otpRequest.updateMany({
+        where: { userId: user.id, purpose: 'PASSWORD_RESET', status: 'ACTIVE' },
+        data: { status: 'CANCELLED' },
+      });
+      const token = crypto.randomBytes(32).toString('hex');
+      await this.prisma.otpRequest.create({
+        data: {
+          userId: user.id,
+          otpHash: sha256(token),
+          purpose: 'PASSWORD_RESET',
+          channel: 'EMAIL',
+          target: user.email,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          maxAttempts: 5,
+        },
+      });
+      const appUrl = (this.config.get<string>('CORS_ORIGIN') || 'http://localhost:3000').replace(/\/$/, '');
+      const resetUrl = `${appUrl}/reset-password?token=${token}`;
+      await this.notifications.publish({
+        eventType: 'PASSWORD_RESET',
+        userId: user.id,
+        destination: user.email,
+        variables: { resetUrl },
+      });
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.log(`Password reset link for ${user.email}: ${resetUrl}`);
+      }
+    }
+    return { message: 'If that email is registered, we sent a reset link.' };
+  }
+
+  async resetPassword(token: string, password: string) {
+    const hashed = sha256(token.trim());
+    const request = await this.prisma.otpRequest.findFirst({
+      where: { otpHash: hashed, purpose: 'PASSWORD_RESET', status: 'ACTIVE' },
+    });
+    if (!request || request.expiresAt < new Date()) {
+      if (request) {
+        await this.prisma.otpRequest.update({
+          where: { id: request.id },
+          data: { status: 'EXPIRED' },
+        });
+      }
+      throw new BadRequestException('This reset link is invalid or has expired.');
+    }
+    if (request.attempts >= request.maxAttempts) {
+      await this.prisma.otpRequest.update({
+        where: { id: request.id },
+        data: { status: 'CANCELLED' },
+      });
+      throw new BadRequestException('This reset link is no longer valid.');
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: request.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.otpRequest.update({
+        where: { id: request.id },
+        data: { status: 'USED', consumedAt: new Date(), attempts: { increment: 1 } },
+      }),
+      this.prisma.session.deleteMany({ where: { userId: request.userId } }),
+    ]);
+    return { message: 'Password updated. Sign in with your new password.' };
   }
 }

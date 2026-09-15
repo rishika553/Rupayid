@@ -47,7 +47,7 @@ class AdminApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: { method?: 'GET' | 'POST'; body?: unknown; params?: Record<string, string> } = {},
+    options: { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; params?: Record<string, string> } = {},
   ): Promise<{
     success: boolean;
     data?: T;
@@ -122,7 +122,7 @@ class AdminApiClient {
   }
 
   kycStats() {
-    return this.request<AdminKycStats>('/api/admin/dashboard/stats');
+    return this.request<AdminDashboardStats>('/api/admin/dashboard/stats');
   }
 
   kycList(params?: { page?: number; limit?: number; status?: string; search?: string }) {
@@ -160,6 +160,59 @@ class AdminApiClient {
       `/api/admin/kyc/${kycId}/documents/${documentId}/url`,
     );
   }
+
+  loanList(params?: { page?: number; limit?: number; status?: string; search?: string }) {
+    const query: Record<string, string> = {};
+    if (params?.page) query.page = String(params.page);
+    if (params?.limit) query.limit = String(params.limit);
+    if (params?.status) query.status = params.status;
+    if (params?.search) query.search = params.search;
+    return this.request<AdminLoanListResult>('/api/admin/loans', { params: query });
+  }
+
+  loanById(id: string) {
+    return this.request<AdminLoanDetail>(`/api/admin/loans/${id}`);
+  }
+
+  loanApprove(id: string, body: { approvedAmount: number; approvedTenure: number; approvedInterest: number; reason?: string }) {
+    return this.request(`/api/admin/loans/${id}/approve`, { method: 'POST', body });
+  }
+
+  loanReject(id: string, reason: string) {
+    return this.request(`/api/admin/loans/${id}/reject`, { method: 'POST', body: { reason } });
+  }
+
+  disbursementList(loanApplicationId?: string) {
+    return this.request<AdminDisbursementListItem[]>('/api/admin/disbursements', {
+      params: loanApplicationId ? { loanApplicationId } : undefined,
+    });
+  }
+
+  disbursementInitiate(body: {
+    loanApplicationId: string;
+    amount: number;
+    method?: string;
+    beneficiaryBankName?: string;
+    beneficiaryAccount?: string;
+    beneficiaryIfsc?: string;
+  }) {
+    return this.request('/api/admin/disbursements', { method: 'POST', body });
+  }
+
+  disbursementStatus(id: string, status: string, providerReference?: string) {
+    return this.request(`/api/admin/disbursements/${id}/status`, {
+      method: 'PATCH',
+      body: { status, providerReference },
+    });
+  }
+
+  repaymentsOverdue() {
+    return this.request<AdminOverdueItem[]>('/api/admin/repayments/overdue');
+  }
+
+  paymentsList() {
+    return this.request<AdminPaymentItem[]>('/api/admin/payments');
+  }
 }
 
 export interface AdminKycStats {
@@ -167,6 +220,123 @@ export interface AdminKycStats {
   pendingReview: number;
   approved: number;
   declined: number;
+}
+
+export interface AdminDashboardStats extends AdminKycStats {
+  loans: {
+    total: number;
+    pendingReview: number;
+    approved: number;
+    rejected: number;
+  };
+  disbursements: {
+    pending: number;
+    success: number;
+  };
+  overdueCount: number;
+}
+
+export interface AdminLoanListItem {
+  id: string;
+  applicationNumber: string;
+  status: string;
+  amountRequested: string;
+  tenureMonths: number;
+  submittedAt: string | null;
+  createdAt: string;
+  productName: string;
+  customerName: string;
+  mobile: string | null;
+}
+
+export interface AdminLoanListResult {
+  data: AdminLoanListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AdminLoanDetail {
+  id: string;
+  applicationNumber: string;
+  status: string;
+  currentState: string;
+  amountRequested: string;
+  tenureMonths: number;
+  interestRate: string;
+  processingFee: string;
+  submittedAt: string | null;
+  createdAt: string;
+  product: { id: string; name: string } | null;
+  customer: { id: string; name: string; email: string | null };
+  approval: {
+    decision: string;
+    approvedAmount: string | null;
+    approvedTenure: number | null;
+    approvedInterest: string | null;
+    reason: string | null;
+    approvedAt: string;
+    approvedByName: string | null;
+  } | null;
+  disbursements: Array<{
+    id: string;
+    amount: string;
+    method: string;
+    status: string;
+    providerReference: string | null;
+    successAt: string | null;
+    createdAt: string;
+    beneficiaryBankName: string | null;
+    beneficiaryAccount: string | null;
+    beneficiaryIfsc: string | null;
+  }>;
+  schedule: Array<{
+    id: string;
+    sequence: number;
+    dueDate: string;
+    totalAmount: string;
+    paidAmount: string;
+    status: string;
+  }>;
+  timeline: Array<{ fromState: string; toState: string; reason: string | null; createdAt: string }>;
+}
+
+export interface AdminDisbursementListItem {
+  id: string;
+  loanApplicationId: string;
+  applicationNumber: string | null;
+  amount: string;
+  method: string;
+  status: string;
+  providerReference: string | null;
+  createdAt: string;
+  successAt: string | null;
+}
+
+export interface AdminOverdueItem {
+  id: string;
+  loanApplicationId: string;
+  applicationNumber: string;
+  sequence: number;
+  dueDate: string;
+  totalAmount: string;
+  paidAmount: string;
+  status: string;
+  customerName: string;
+  mobile: string | null;
+}
+
+export interface AdminPaymentItem {
+  id: string;
+  applicationNumber: string | null;
+  customerName: string;
+  amount: string;
+  status: string;
+  method: string;
+  direction: string;
+  createdAt: string;
+  capturedAt: string | null;
 }
 
 export interface AdminKycListItem {

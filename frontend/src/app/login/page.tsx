@@ -214,6 +214,11 @@ function AuthForm() {
               <Button className="w-full" type="submit" disabled={submitting}>
                 {signInForm.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
               </Button>
+              <p className="text-center text-sm">
+                <a href="/forgot-password" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                  Forgot password?
+                </a>
+              </p>
             </form>
           ) : (
             <form className="space-y-4" onSubmit={signUpForm.handleSubmit(onCreateAccount)} noValidate>
