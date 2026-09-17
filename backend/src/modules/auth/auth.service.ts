@@ -15,6 +15,7 @@ import { OtpAuthService } from './otp-auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { verifyGoogleIdToken } from './google-id-token';
 import { sha256 } from './crypto.util';
+import { parseCorsOrigins } from '../../common/config/app.config';
 import type { GoogleAuthDto, RegisterDto } from './dto/auth.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -148,7 +149,7 @@ export class AuthService {
           maxAttempts: 5,
         },
       });
-      const appUrl = (this.config.get<string>('CORS_ORIGIN') || 'http://localhost:3000').replace(/\/$/, '');
+      const appUrl = parseCorsOrigins(process.env.CORS_ORIGIN)[0];
       const resetUrl = `${appUrl}/reset-password?token=${token}`;
       await this.notifications.publish({
         eventType: 'PASSWORD_RESET',

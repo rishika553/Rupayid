@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ThrottleGuard } from './common/guards/throttle.guard';
+import { parseCorsOrigins } from './common/config/app.config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -18,7 +19,7 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: parseCorsOrigins(process.env.CORS_ORIGIN),
     credentials: true,
   });
 
