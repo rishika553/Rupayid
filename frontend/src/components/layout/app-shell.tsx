@@ -3,9 +3,9 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
-  Bell,
   CreditCard,
   FileCheck2,
   Home,
@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Button, cn } from '@rupayaid/ui';
+import { cn } from '@rupayaid/ui';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { useCustomerDashboard } from '@/hooks/use-customer-data';
@@ -30,7 +30,6 @@ const DESKTOP_NAV = [
   { href: '/payments', label: 'Payments' },
   { href: '/kyc', label: 'KYC' },
   { href: '/referral', label: 'Referrals' },
-  { href: '/notifications', label: 'Alerts' },
 ] as const;
 
 const MOBILE_NAV = [
@@ -43,16 +42,20 @@ const MORE_NAV = [
   { href: '/payments', label: 'Payments', icon: CreditCard },
   { href: '/kyc', label: 'KYC', icon: FileCheck2 },
   { href: '/referral', label: 'Referrals', icon: Share2 },
-  { href: '/notifications', label: 'Alerts', icon: Bell },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const dashboard = useCustomerDashboard().data;
   const [moreOpen, setMoreOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`;
+
+  async function signOut() {
+    await logout();
+    router.replace('/login');
+  }
 
   useEffect(() => {
     setMoreOpen(false);
@@ -107,38 +110,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <Link
-              href="/notifications"
-              aria-label="Notifications"
-              className={cn(
-                'relative hidden rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground sm:inline-flex',
-                pathname === '/notifications' && 'bg-secondary text-foreground',
-              )}
-            >
-              <Bell className="h-5 w-5" />
-              {(dashboard?.notifications.unreadCount || 0) > 0 ? (
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
-              ) : null}
-            </Link>
-            <Link
-              href="/profile"
-              aria-label="Open profile"
-              aria-current={pathname === '/profile' ? 'page' : undefined}
-              className={cn(
-                'flex items-center gap-2 rounded-md px-1 py-1 hover:bg-secondary',
-                pathname === '/profile' && 'bg-secondary',
-              )}
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                {initials || 'CU'}
-              </span>
-              <div className="hidden leading-tight sm:block">
-                <p className="max-w-32 truncate text-sm font-medium">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground">Customer</p>
-              </div>
-            </Link>
+            <AccountMenu
+              name={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Account'}
+              onProfile={pathname === '/profile'}
+              onLogout={() => void signOut()}
+            />
             {dashboard?.kyc.status ? (
               <span className="hidden xl:inline-flex">
                 <Badge tone={statusTone(dashboard.kyc.status)}>
@@ -146,15 +122,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Badge>
               </span>
             ) : null}
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden lg:inline-flex"
-              onClick={() => void logout()}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </Button>
           </div>
         </div>
       </header>
@@ -208,9 +175,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 id="more-menu-title" className="font-semibold">More</h2>
-                <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground">
+                <p className="text-sm text-muted-foreground">
                   {user?.firstName} {user?.lastName}
-                </Link>
+                </p>
               </div>
               <button
                 ref={closeButtonRef}
@@ -248,14 +215,75 @@ export function AppShell({ children }: { children: ReactNode }) {
               })}
             </div>
 
-            <Button className="mt-4 w-full" variant="outline" onClick={() => void logout()}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </Button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Link
+                href="/profile"
+                className="flex items-center justify-center rounded-lg border p-3 text-sm font-medium hover:bg-secondary"
+              >
+                Profile
+              </Link>
+              <button
+                type="button"
+                className="flex items-center justify-center gap-2 rounded-lg border p-3 text-sm font-medium hover:bg-secondary"
+                onClick={() => void signOut()}
+              >
+                <LogOut className="h-4 w-4 text-primary" aria-hidden />
+                Log out
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AccountMenu({
+  name,
+  onProfile,
+  onLogout,
+}: {
+  name: string;
+  onProfile: boolean;
+  onLogout: () => void;
+}) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        aria-label="Account menu"
+        className={cn(
+          'max-w-40 truncate rounded-md px-2 py-1 text-sm font-medium hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          onProfile && 'bg-secondary',
+        )}
+      >
+        {name}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 min-w-44 rounded-lg border bg-card p-1 shadow-lg"
+        >
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/profile"
+              className="flex cursor-pointer items-center rounded-md px-3 py-2 text-sm outline-none hover:bg-secondary focus:bg-secondary"
+            >
+              Profile
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-secondary focus:bg-secondary"
+            onSelect={() => {
+              onLogout();
+            }}
+          >
+            <LogOut className="h-4 w-4 text-muted-foreground" aria-hidden />
+            Log out
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

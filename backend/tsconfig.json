@@ -2,6 +2,8 @@
   "extends": "../packages/config/tsconfig.backend.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "rootDir": ".",
+    "outDir": "./dist",
     "paths": {
       "@/*": ["./src/*"],
       "@rupayaid/types": ["../packages/types"]
