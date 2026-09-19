@@ -1,6 +1,10 @@
 import { registerAs } from '@nestjs/config';
 
-const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'https://rupayaidwebapp.vercel.app'];
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'https://rupayaidwebapp.vercel.app',
+  'https://rupayaidwebappp.vercel.app',
+];
 
 export function parseCorsOrigins(raw?: string): string[] {
   const fromEnv = (raw || '')

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type Redis from 'ioredis';
 import { hasUsableRedisUrl, REDIS_CLIENT } from '../../common/redis/redis.module';
@@ -15,9 +15,6 @@ export class OtpRateLimitService {
   async assertWithinLimit(key: string, max: number, windowMs: number): Promise<void> {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (!hasUsableRedisUrl(redisUrl)) {
-      if (this.configService.get<string>('NODE_ENV') === 'production') {
-        throw new ServiceUnavailableException('Rate limiter unavailable');
-      }
       this.consumeMemory(key, max, windowMs);
       return;
     }
@@ -32,9 +29,6 @@ export class OtpRateLimitService {
       }
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      if (this.configService.get<string>('NODE_ENV') === 'production') {
-        throw new ServiceUnavailableException('Rate limiter unavailable');
-      }
       this.consumeMemory(key, max, windowMs);
     }
   }
