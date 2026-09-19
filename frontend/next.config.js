@@ -19,6 +19,10 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/:path*',
+        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' }],
+      },
+      {
         source: '/api/:path*',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: process.env.NEXT_PUBLIC_API_URL || '*' },
