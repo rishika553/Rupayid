@@ -79,7 +79,7 @@ export function KycWizard({
 
   const reviewRows = useMemo(
     () => [
-      ['Mobile', application.contact?.phoneNumber || '—'],
+      ['Mobile', values.phoneNumber || '—'],
       ['Date of birth', formatDate(values.dateOfBirth)],
       ['Gender', values.gender],
       ['Father / spouse', values.fatherOrSpouseName],
@@ -270,13 +270,21 @@ export function KycWizard({
                 <KycField
                   label="Mobile number"
                   htmlFor="phoneNumber"
-                  hint={application.contact?.phoneVerified ? 'Verified at sign-in' : 'From your sign-in'}
+                  hint="Required. Enter exactly 10 digits"
+                  error={form.formState.errors.phoneNumber?.message}
                 >
                   <Input
                     id="phoneNumber"
-                    value={application.contact?.phoneNumber || ''}
-                    readOnly
+                    {...form.register('phoneNumber', {
+                      onChange: (event) => {
+                        event.target.value = event.target.value.replace(/\D/g, '').slice(0, 10);
+                      },
+                    })}
                     autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    required
+                    placeholder="9876543210"
                   />
                 </KycField>
                 <KycField label="Date of birth" htmlFor="dateOfBirth" error={form.formState.errors.dateOfBirth?.message}>

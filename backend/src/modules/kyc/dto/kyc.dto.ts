@@ -13,6 +13,12 @@ import {
 } from 'class-validator';
 
 export class UpsertKycDetailsDto {
+  @ApiPropertyOptional({ example: '9876543210' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[6-9]\d{9}$|^\+91[6-9]\d{9}$/, { message: 'Enter a valid 10-digit mobile number' })
+  phoneNumber?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()

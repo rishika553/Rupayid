@@ -31,7 +31,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = exResponse;
       } else if (typeof exResponse === 'object' && exResponse !== null) {
         const obj = exResponse as Record<string, unknown>;
-        message = (obj.message as string | object) || message;
+        const rawMessage = obj.message ?? message;
+        message = Array.isArray(rawMessage)
+          ? rawMessage.map(String).filter(Boolean).join('. ')
+          : (rawMessage as string | object);
         error = (obj.error as string) || error;
       }
     } else if (exception instanceof Error) {

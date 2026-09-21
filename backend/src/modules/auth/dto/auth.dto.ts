@@ -35,11 +35,6 @@ export class RegisterDto {
   @MaxLength(100)
   lastName!: string;
 
-  @ApiPropertyOptional({ example: '+919876543210' })
-  @IsOptional()
-  @IsString()
-  phoneNumber?: string;
-
   @ApiPropertyOptional({ example: 'RAP-ABCD2345' })
   @IsOptional()
   @IsString()

@@ -1,15 +1,18 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ConfirmKycDocumentDto, RequestKycUploadDto, UpsertKycDetailsDto } from './dto/kyc.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { normalizeIndianMobile } from '../auth/phone.util';
 
 const EDITABLE = ['DRAFT', 'RESUBMISSION_REQUIRED'] as const;
 const STAFF_ROLES = ['ADMIN', 'UNDERWRITER'];
@@ -113,6 +116,7 @@ export class KycService {
       include: {
         documents: true,
         details: true,
+        user: { select: { phoneNumber: true } },
         decisions: {
           select: { decision: true, reason: true },
           orderBy: { createdAt: 'asc' },
@@ -138,7 +142,7 @@ export class KycService {
       status: app.status,
       exists: true,
       canEdit: editable,
-      canSubmit: editable && this.isReadyToSubmit(app.details, app.documents.length),
+      canSubmit: editable && this.isReadyToSubmit(app.details, app.documents.length, app.user.phoneNumber),
       documentCount: app.documents.length,
       submittedAt: app.submittedAt,
       reviewedAt: app.reviewedAt,
@@ -156,6 +160,37 @@ export class KycService {
       create: { kycApplicationId: app.id, ...details },
       update: details,
     });
+
+    if (dto.phoneNumber?.trim()) {
+      const phoneNumber = normalizeIndianMobile(dto.phoneNumber);
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { phoneNumber: true },
+      });
+      if (current?.phoneNumber !== phoneNumber) {
+        const taken = await this.prisma.user.findFirst({
+          where: { phoneNumber, id: { not: userId } },
+          select: { id: true },
+        });
+        if (taken) {
+          throw new ConflictException('This mobile number is already registered');
+        }
+        try {
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              phoneNumber,
+              phoneVerified: false,
+            },
+          });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw new ConflictException('This mobile number is already registered');
+          }
+          throw error;
+        }
+      }
+    }
 
     if (dto.aadhaarLastFour || dto.panLastFour || dto.city || dto.state || dto.pincode) {
       await this.prisma.customerProfile.upsert({
@@ -207,12 +242,12 @@ export class KycService {
     const app = await this.requireEditable(userId);
     const full = await this.prisma.kycApplication.findUnique({
       where: { id: app.id },
-      include: { details: true, documents: true },
+      include: { details: true, documents: true, user: { select: { phoneNumber: true } } },
     });
     if (!full) {
       throw new NotFoundException('KYC application not found');
     }
-    this.assertReadyToSubmit(full.details, full.documents.length);
+    this.assertReadyToSubmit(full.details, full.documents.length, full.user.phoneNumber);
 
     await this.prisma.$transaction([
       this.prisma.kycApplication.update({
@@ -469,9 +504,10 @@ export class KycService {
       ifsc: string | null;
     } | null,
     documentCount: number,
+    phoneNumber?: string | null,
   ) {
     try {
-      this.assertReadyToSubmit(details, documentCount);
+      this.assertReadyToSubmit(details, documentCount, phoneNumber);
       return true;
     } catch {
       return false;
@@ -515,7 +551,11 @@ export class KycService {
       ifsc: string | null;
     } | null,
     documentCount: number,
+    phoneNumber?: string | null,
   ) {
+    if (!phoneNumber?.trim()) {
+      throw new BadRequestException('Enter a mobile number before submitting');
+    }
     if (!details?.dateOfBirth || !details.addressLine1 || !details.city || !details.state || !details.pincode) {
       throw new BadRequestException('Complete personal and address information before submitting');
     }

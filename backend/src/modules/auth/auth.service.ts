@@ -59,7 +59,6 @@ export class AuthService {
       passwordHash: hashedPassword,
       firstName: dto.firstName.trim(),
       lastName: dto.lastName.trim(),
-      phoneNumber: dto.phoneNumber?.trim() || undefined,
     });
 
     await this.referrals.provisionForUser(user.id, ip, userAgent);

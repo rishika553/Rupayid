@@ -12,7 +12,35 @@ function adultDate(value: string) {
   return date <= cutoff;
 }
 
+export function toTenDigitMobile(value?: string | null) {
+  const digits = (value || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+  if (digits.length > 10) {
+    return digits.slice(-10);
+  }
+  return digits;
+}
+
 export const kycPersonalSchema = z.object({
+  phoneNumber: z.string().superRefine((value, ctx) => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      ctx.addIssue({ code: 'custom', message: 'Mobile number is required' });
+      return;
+    }
+    if (digits.length !== 10) {
+      ctx.addIssue({ code: 'custom', message: 'Enter exactly 10 digits' });
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a valid 10-digit mobile number' });
+    }
+  }),
   dateOfBirth: z
     .string()
     .min(1, 'Enter your date of birth')
@@ -73,6 +101,7 @@ export const kycBankSchema = z
   });
 
 export const kycFormSchema = z.object({
+  phoneNumber: z.string(),
   dateOfBirth: z.string(),
   gender: z.string(),
   fatherOrSpouseName: z.string(),
@@ -97,6 +126,7 @@ export const kycFormSchema = z.object({
 export type KycFormValues = z.infer<typeof kycFormSchema>;
 
 export const KYC_FORM_DEFAULTS: KycFormValues = {
+  phoneNumber: '',
   dateOfBirth: '',
   gender: '',
   fatherOrSpouseName: '',
@@ -130,6 +160,7 @@ export function valuesFromKyc(application: KycApplication): KycFormValues {
   const hasBank = Boolean(bank?.accountLastFour || bank?.ifsc || bank?.accountHolderName);
   return {
     ...KYC_FORM_DEFAULTS,
+    phoneNumber: toTenDigitMobile(application.contact?.phoneNumber),
     dateOfBirth: isoDate(application.personal?.dateOfBirth),
     gender: application.personal?.gender || '',
     fatherOrSpouseName: application.personal?.fatherOrSpouseName || '',
@@ -155,6 +186,7 @@ export function valuesFromKyc(application: KycApplication): KycFormValues {
 export function kycPatchBody(values: KycFormValues): Record<string, string> {
   const body: Record<string, string> = {};
   const fields: Array<keyof Omit<KycFormValues, 'includeBank'>> = [
+    'phoneNumber',
     'dateOfBirth',
     'gender',
     'fatherOrSpouseName',
@@ -172,7 +204,7 @@ export function kycPatchBody(values: KycFormValues): Record<string, string> {
   for (const field of fields) {
     const value = values[field];
     if (value.trim()) {
-      body[field] = value.trim();
+      body[field] = field === 'phoneNumber' ? toTenDigitMobile(value) : value.trim();
     }
   }
   if (values.includeBank) {

@@ -256,10 +256,14 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Contact information</CardTitle>
-            <CardDescription>Email can be updated here. Mobile is taken from your account.</CardDescription>
+            <CardDescription>Email can be updated here. Mobile number is collected in KYC.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <KycField label="Mobile" htmlFor="phone" hint={profile.contact.phoneVerified ? 'Verified' : 'Not verified'}>
+            <KycField
+              label="Mobile"
+              htmlFor="phone"
+              hint={profile.contact.phoneNumber ? 'Update this in KYC' : 'Add this in KYC'}
+            >
               <Input id="phone" value={profile.contact.phoneNumber || ''} readOnly />
             </KycField>
             <KycField label="Email" htmlFor="email" error={form.formState.errors.email?.message}>
