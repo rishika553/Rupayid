@@ -19,14 +19,14 @@
 | `JWT_SECRET` | Yes | JWT signing secret |
 | `JWT_EXPIRES_IN` | No | Access token expiry |
 | `REFRESH_TOKEN_SECRET` | Yes | Refresh token secret |
-| `OTP_PEPPER` | Yes | HMAC pepper for hashing OTPs |
 | `DIGIMILES_USERNAME` | Production | Digimiles SMS username (mock SMS if unset) |
 | `DIGIMILES_PASSWORD` | Production | Digimiles SMS password |
 | `DIGIMILES_BASE_URL` | No | Digimiles send URL |
 | `DIGIMILES_SENDER_ID` | Production | 6-letter DLT header |
 | `DIGIMILES_ENTITY_ID` | Production | 19-digit DLT Principal Entity ID |
-| `DIGIMILES_TEMPLATE_OTP` | Production | DLT template ID for OTP SMS |
-| `REDIS_URL` | Yes | Redis connection string (Upstash) |
+| `REDIS_URL` | Recommended | Redis connection string. Without it, rate limits are counted per server instance |
+| `TRUST_PROXY_HOPS` | No | Number of proxies in front of the API used to resolve the client IP (default `1`, correct for Render) |
+| `ENABLE_SWAGGER` | No | Set `true` to serve `/api/docs` in production (always on in development) |
 | `R2_ACCOUNT_ID` | Yes | Cloudflare R2 account ID |
 | `R2_ACCESS_KEY_ID` | Yes | R2 access key |
 | `R2_SECRET_ACCESS_KEY` | Yes | R2 secret key |

@@ -15,6 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { normalizeIndianMobile } from '../auth/phone.util';
 
 const EDITABLE = ['DRAFT', 'RESUBMISSION_REQUIRED'] as const;
+const MAX_DOCUMENTS_PER_APPLICATION = 10;
 const STAFF_ROLES = ['ADMIN', 'UNDERWRITER'];
 
 const DOCUMENT_PUBLIC_SELECT = {
@@ -310,6 +311,34 @@ export class KycService {
       throw new ForbiddenException('Invalid document reference');
     }
 
+    const [alreadyConfirmed, documentCount] = await Promise.all([
+      this.prisma.kycDocument.findFirst({
+        where: { fileStorageKey: dto.objectKey },
+        select: { id: true },
+      }),
+      this.prisma.kycDocument.count({ where: { kycApplicationId: app.id } }),
+    ]);
+    if (alreadyConfirmed) {
+      throw new ConflictException('This document has already been added');
+    }
+    if (documentCount >= MAX_DOCUMENTS_PER_APPLICATION) {
+      throw new BadRequestException(
+        `You can upload up to ${MAX_DOCUMENTS_PER_APPLICATION} documents`,
+      );
+    }
+
+    const stored = await this.files.statObject(dto.objectKey);
+    if (!stored) {
+      throw new BadRequestException('Upload not found. Please upload the file again.');
+    }
+    if (stored.sizeBytes !== dto.fileSizeBytes) {
+      throw new BadRequestException('Uploaded file does not match. Please upload the file again.');
+    }
+    if (stored.contentType && stored.contentType !== dto.mimeType) {
+      throw new BadRequestException('Uploaded file type does not match. Please upload the file again.');
+    }
+    this.files.assertAllowedUpload(dto.mimeType, stored.sizeBytes);
+
     const document = await this.prisma.kycDocument.create({
       data: {
         kycApplicationId: app.id,
@@ -354,127 +383,6 @@ export class KycService {
       throw new NotFoundException('Document not found');
     }
     return this.files.getSignedDownloadUrl(document.fileStorageKey);
-  }
-
-  async findByUser(userId: string) {
-    const mine = await this.getMine(userId);
-    return [mine];
-  }
-
-  async findById(id: string, requesterId: string) {
-    const app = await this.prisma.kycApplication.findUnique({
-      where: { id },
-      include: {
-        details: true,
-        documents: { select: DOCUMENT_PUBLIC_SELECT },
-        decisions: {
-          select: { id: true, decision: true, reason: true, reviewedAt: true, createdAt: true },
-        },
-        user: { select: KYC_USER_SELECT },
-      },
-    });
-    if (!app) {
-      throw new NotFoundException('KYC application not found');
-    }
-    const staff = await this.isStaff(requesterId);
-    if (app.userId !== requesterId && !staff) {
-      throw new NotFoundException('KYC application not found');
-    }
-    return staff ? app : this.toCustomerView(app);
-  }
-
-  async listPendingReviews(page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
-    const where = { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] as never[] } };
-    const [applications, total] = await Promise.all([
-      this.prisma.kycApplication.findMany({
-        where,
-        include: {
-          user: { select: KYC_USER_SELECT },
-          documents: { select: DOCUMENT_PUBLIC_SELECT },
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.kycApplication.count({ where }),
-    ]);
-    return { data: applications, total, page, limit, totalPages: Math.ceil(total / limit) };
-  }
-
-  async reviewDecision(
-    id: string,
-    data: { decision: string; reason?: string; reviewedById: string },
-  ) {
-    await this.findById(id, data.reviewedById);
-    let newStatus: 'APPROVED' | 'REJECTED' | 'RESUBMISSION_REQUIRED' = 'REJECTED';
-    if (data.decision === 'APPROVED') {
-      newStatus = 'APPROVED';
-    } else if (data.decision === 'REQUESTED_MORE_INFO') {
-      newStatus = 'RESUBMISSION_REQUIRED';
-    }
-
-    const current = await this.prisma.kycApplication.findUnique({ where: { id } });
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.kycApplication.update({
-        where: { id },
-        data: {
-          status: newStatus,
-          reviewedAt: new Date(),
-          reviewedBy: data.reviewedById,
-        },
-      }),
-      this.prisma.kycVerificationDecisionRecord.create({
-        data: {
-          kycApplicationId: id,
-          decision: data.decision as never,
-          reason: data.reason,
-          reviewedById: data.reviewedById,
-        },
-      }),
-      this.prisma.kycSubmissionHistory.create({
-        data: {
-          kycApplicationId: id,
-          fromStatus: current?.status,
-          toStatus: newStatus,
-          snapshot: { decision: data.decision, reason: data.reason } as never,
-          createdById: data.reviewedById,
-        },
-      }),
-    ]);
-
-    if (newStatus === 'APPROVED') {
-      const app = await this.prisma.kycApplication.findUnique({ where: { id } });
-      if (app) {
-        await this.prisma.customerProfile.upsert({
-          where: { userId: app.userId },
-          create: { userId: app.userId, hasKycCompleted: true },
-          update: { hasKycCompleted: true },
-        });
-      }
-    }
-
-    await this.audit.log({
-      actionType: newStatus === 'APPROVED' ? 'KYC_APPROVED' : 'KYC_REJECTED',
-      entityType: 'KycApplication',
-      entityId: id,
-      eventCategory: 'KYC',
-      changedById: data.reviewedById,
-      changedForUserId: current?.userId,
-      message: `KYC ${newStatus.toLowerCase()}`,
-      diffSummary: { decision: data.decision, reason: data.reason },
-    });
-    if (current?.userId) {
-      await this.notifications?.publish({
-        eventType: newStatus === 'APPROVED' ? 'KYC_APPROVED' : 'KYC_REJECTED',
-        userId: current.userId,
-        referenceId: id,
-        dedupeKey: `kyc-decision:${id}:${newStatus}`,
-        variables: { reason: data.reason || '' },
-      });
-    }
-
-    return updated;
   }
 
   private async requireEditable(userId: string) {

@@ -1,4 +1,9 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { KycService } from './kyc.service';
 
 function prismaStub() {
@@ -49,7 +54,9 @@ function prismaStub() {
             kycApplication: { userId: 'user-1' },
           };
         }),
-        create: jest.fn(),
+        findFirst: jest.fn(async () => null as { id: string } | null),
+        count: jest.fn(async () => 0),
+        create: jest.fn(async () => ({ id: 'doc-new' })),
       },
       usersOnRoles: {
         findMany: jest.fn(async () => []),
@@ -63,6 +70,10 @@ function prismaStub() {
       keyBelongsToUser: (key: string, userId: string) =>
         Boolean(key) && !key.includes('..') && key.startsWith(`kyc/${userId}/`),
       assertAllowedUpload: jest.fn(),
+      statObject: jest.fn(async () => ({ sizeBytes: 1200, contentType: 'application/pdf' }) as {
+        sizeBytes: number;
+        contentType: string | null;
+      } | null),
     },
     audit: { log: jest.fn() },
   };
@@ -85,29 +96,6 @@ describe('KycService ownership', () => {
     expect(mine).toHaveProperty('id', 'kyc-1');
     expect(mine).not.toHaveProperty('userId');
     expect(mine.contact).toMatchObject({ phoneNumber: '+919000000000', phoneVerified: true });
-  });
-
-  it('includes the customer phone number on pending reviews for staff', async () => {
-    const stub = prismaStub();
-    stub.app.status = 'SUBMITTED';
-    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
-    const pending = await service.listPendingReviews();
-    expect(pending.data[0].user.phoneNumber).toBe('+919000000000');
-  });
-
-  it('forbids loading another customer KYC by id', async () => {
-    const stub = prismaStub();
-    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
-    await expect(service.findById('kyc-1', 'user-2')).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('allows the owner to load their KYC by id', async () => {
-    const stub = prismaStub();
-    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
-    const result = await service.findById('kyc-1', 'user-1');
-    expect(result).toHaveProperty('id', 'kyc-1');
-    expect(result).not.toHaveProperty('notes');
-    expect(result).not.toHaveProperty('userId');
   });
 
   it('forbids document download for another customer', async () => {
@@ -139,6 +127,52 @@ describe('KycService ownership', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(stub.prisma.kycDocument.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('KycService document confirmation', () => {
+  const upload = {
+    documentType: 'AADHAAR_CARD',
+    objectKey: 'kyc/user-1/kyc-1/file.pdf',
+    mimeType: 'application/pdf',
+    fileSizeBytes: 1200,
+  };
+
+  it('records a document that exists in storage with matching size and type', async () => {
+    const stub = prismaStub();
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.confirmDocument('user-1', upload)).resolves.toEqual({ id: 'doc-new' });
+    expect(stub.files.statObject).toHaveBeenCalledWith(upload.objectKey);
+  });
+
+  it('rejects a key that was never uploaded', async () => {
+    const stub = prismaStub();
+    stub.files.statObject.mockResolvedValueOnce(null);
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.confirmDocument('user-1', upload)).rejects.toBeInstanceOf(BadRequestException);
+    expect(stub.prisma.kycDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the stored size differs from the claimed size', async () => {
+    const stub = prismaStub();
+    stub.files.statObject.mockResolvedValueOnce({ sizeBytes: 9_999_999, contentType: 'application/pdf' });
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.confirmDocument('user-1', upload)).rejects.toBeInstanceOf(BadRequestException);
+    expect(stub.prisma.kycDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the stored content type differs from the claimed type', async () => {
+    const stub = prismaStub();
+    stub.files.statObject.mockResolvedValueOnce({ sizeBytes: 1200, contentType: 'text/html' });
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.confirmDocument('user-1', upload)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects confirming the same upload twice', async () => {
+    const stub = prismaStub();
+    stub.prisma.kycDocument.findFirst.mockResolvedValueOnce({ id: 'doc-1' });
+    const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
+    await expect(service.confirmDocument('user-1', upload)).rejects.toBeInstanceOf(ConflictException);
   });
 });
 

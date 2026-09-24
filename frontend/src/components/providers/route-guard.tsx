@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { useAdminAuth } from '@/components/providers/admin-auth-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const CUSTOMER_PUBLIC_PATHS = ['/', '/login', '/verify-otp', '/forgot-password', '/reset-password'];
+const CUSTOMER_PUBLIC_PATHS = ['/', '/login', '/forgot-password', '/reset-password'];
 const CUSTOMER_PATHS = [
   '/dashboard',
   '/loans',
@@ -41,7 +41,7 @@ export function RouteGuard({ children }: { children: ReactNode }) {
             ? '/login'
             : customerAuthenticated && isCustomerRoute
               ? null
-              : customerAuthenticated && (pathname === '/login' || pathname === '/verify-otp')
+              : customerAuthenticated && pathname === '/login'
                 ? '/dashboard'
                 : null;
 
@@ -57,7 +57,7 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     }
     const keepSessionOnBack = () => {
       const path = window.location.pathname;
-      if (path === '/login' || path === '/verify-otp') {
+      if (path === '/login') {
         router.replace('/dashboard');
       }
     };

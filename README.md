@@ -1,141 +1,111 @@
 # RupayAid
 
-Production-grade lending platform built with a modern, type-safe monorepo architecture.
+Lending platform for Indian customers: sign up, complete KYC, apply for a loan, receive the disbursement and repay online. Staff review KYC and loans in an admin portal.
 
-## Tech Stack
-
-### Frontend
-- **Next.js 14** (App Router) - React framework
-- **TypeScript** - Static typing
-- **Tailwind CSS** - Utility-first styling
-- **shadcn/ui** + **Radix UI** - Accessible component primitives
-- **React Hook Form** + **Zod** - Form handling and validation
-- **TanStack Query** - Server-state management
-- **TanStack Table** - Data tables
-
-### Backend
-- **NestJS** - Modular Node.js framework
-- **TypeScript** - Static typing
-- **Prisma ORM** - Type-safe database access
-- **Passport.js** - Authentication strategies
-- **JWT** - Token-based auth
-- **BullMQ** - Background job processing
-
-### Database & Cache
-- **PostgreSQL** (via **Neon**) - Primary database
-- **Redis** (via **Upstash**) - Caching and queues
-
-### Infrastructure
-- **Vercel** - Frontend deployment
-- **Railway / Fly.io** - Backend deployment
-- **Cloudflare R2** - Document storage
-- **GitHub Actions** - CI/CD
-- **Sentry** - Error monitoring
-- **Better Stack** - Logging
-
-## Monorepo Structure
+## How the pieces fit
 
 ```
-rupayaid/
-├── backend/                # NestJS backend API
-├── frontend/               # Next.js frontend
-├── packages/
-│   ├── config/             # Shared configs (TS, ESLint, Prettier)
-│   ├── ui/                 # Shared UI components (shadcn/ui)
-│   ├── types/              # Shared TypeScript types
-│   └── docs/               # Documentation
-└── ...
+landing_pagee (marketing site, Vercel)
+        │  "Get started" / "Sign in"
+        ▼
+frontend (customer portal + admin portal, Vercel)
+        │  REST + JWT
+        ▼
+backend (NestJS API, Render) ──► PostgreSQL (Neon)
+                               ├─► Cloudflare R2 (KYC documents)
+                               ├─► Razorpay (repayments)
+                               ├─► Resend (email) / Digimiles (SMS)
+                               └─► Redis (optional, rate limits)
 ```
+
+| Folder | What it is |
+|--------|------------|
+| `landing_pagee/` | Standalone Next.js marketing site. Not part of the pnpm workspace; deployed as its own Vercel project. |
+| `frontend/` | Next.js 14 app: customer portal (`/login`, `/dashboard`, `/kyc`, `/loans`, `/repayments`, `/payments`, `/referral`, `/notifications`, `/profile`) and admin portal (`/admin`). |
+| `backend/` | NestJS API with Prisma. Customer routes under `/api/v1`, staff routes under `/api/admin`. |
+| `packages/types` | Shared TypeScript types. |
+| `packages/ui` | Shared UI components. |
+| `packages/config` | Shared TS / ESLint / Prettier config. |
+| `packages/docs` | Architecture, environment variables, development notes. |
+
+## Customer sign-in
+
+Customers sign in with email + password or Google. The mobile number is collected in the KYC personal-details step (required, 10 digits), not at sign-in. Sessions use a short-lived access token plus a rotating refresh token stored in the `Session` table.
+
+Staff sign in separately at `/admin` with a username and password.
 
 ## Prerequisites
 
 - Node.js >= 20
-- pnpm >= 8
+- pnpm 8
 - PostgreSQL (local or Neon)
-- Redis (local or Upstash)
-- Environment variables (see `.env.example` files)
+- Redis is optional; without it rate limits fall back to in-memory
 
-## Installation
+## Setup
 
 ```bash
-# Install dependencies
 pnpm install
 
-# Copy environment variables
-copy frontend/.env.example frontend/.env.local
-copy backend/.env.example backend/.env.local
+# create backend/.env and frontend/.env.local (see packages/docs/ENV.md)
 
-# Set up database (fill in DATABASE_URL first)
 pnpm db:generate
-pnpm db:push
+pnpm db:migrate
+pnpm db:seed
+```
+
+The landing site installs on its own:
+
+```bash
+cd landing_pagee
+pnpm install --ignore-workspace
+pnpm dev
 ```
 
 ## Development
 
 ```bash
-# Run both frontend and backend together
-pnpm dev
-
-# Run individually
-pnpm dev:web    # Next.js on http://localhost:3000
-pnpm dev:api    # NestJS on http://localhost:3001
+pnpm dev        # frontend + backend
+pnpm dev:web    # frontend on http://localhost:3000
+pnpm dev:api    # backend on http://localhost:3001
 ```
 
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
-| `pnpm dev` | Run web + api in development |
-| `pnpm build` | Build all apps for production |
-| `pnpm lint` | Run ESLint across all workspaces |
-| `pnpm typecheck` | Run TypeScript checks |
-| `pnpm format` | Format all files with Prettier |
-| `pnpm test` | Run tests |
-| `pnpm db:generate` | Generate Prisma client |
-| `pnpm db:push` | Push schema to database |
-| `pnpm db:migrate` | Create/apply migrations |
+| `pnpm dev` | Run frontend and backend |
+| `pnpm build` | Build frontend and backend |
+| `pnpm lint` | ESLint across workspaces |
+| `pnpm typecheck` | TypeScript checks |
+| `pnpm test` | Unit tests |
+| `pnpm db:generate` | Generate the Prisma client |
+| `pnpm db:migrate` | Create/apply migrations (development) |
+| `pnpm db:seed` | Seed roles, loan products, the admin user and demo customers |
 | `pnpm db:studio` | Open Prisma Studio |
 
-## API Endpoints
+## API
 
-Base URL: `http://localhost:3001/api/v1`
+Base URL: `http://localhost:3001/api/v1`. Swagger UI is at `/api/docs` in development (set `ENABLE_SWAGGER=true` to expose it in production).
 
-- `POST /auth/login` - User login
-- `POST /auth/register` - User registration
-- `GET /users` - List users (paginated)
-- `GET /health` - Health check
-- `GET /docs` (Swagger) - API documentation
-
-## Environment Variables
-
-Each application has its own `.env.example` file documenting the required variables. Never commit real `.env` files.
+| Area | Routes |
+|------|--------|
+| Auth | `POST /auth/register`, `/auth/login`, `/auth/google`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
+| Customer | `/customers/me`, `/dashboard`, `/kyc`, `/files`, `/eligibility`, `/loan-products`, `/loans`, `/repayments`, `/payments`, `/referrals`, `/notifications` |
+| Admin | `/api/admin/auth`, `/api/admin/dashboard`, `/api/admin/kyc`, `/api/admin/loans`, `/api/admin/disbursements`, `/api/admin/repayments`, `/api/admin/payments` |
+| Health | `GET /health` |
 
 ## Deployment
 
-### Frontend (Vercel)
-- Import the `frontend` directory
-- Set environment variables matching `.env.example`
-- Framework preset: Next.js
+| App | Host | Settings |
+|-----|------|----------|
+| Landing site | Vercel | Root Directory `landing_pagee`, install `pnpm install --ignore-workspace`, build `pnpm exec next build` |
+| Customer + admin portal | Vercel | Root Directory `frontend`; set `NEXT_PUBLIC_API_URL` to the backend `/api/v1` URL |
+| API | Render | Build the `@rupayaid/api` package, run `prisma migrate deploy`, start with `start:prod` (`node dist/src/main.js`) |
+| Database | Neon | `DATABASE_URL` on Render |
 
-### Backend (Railway/Fly.io)
-- Deploy the `backend` directory
-- Configure `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`
-- Prisma migrations run via release command
+Render's free tier sleeps when idle, so the first request after a quiet period can take close to a minute.
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-CI runs lint, typecheck, and build on all pushes and PRs.
-
-## Monitoring
-
-- **Sentry** for error tracking (set `SENTRY_DSN`)
-- **Better Stack** for structured logging (set `BETTER_STACK_SOURCE_KEY`)
+Environment variables for every app are listed in [`packages/docs/ENV.md`](packages/docs/ENV.md). Never commit real `.env` files.
 
 ## License
 

@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseDurationToMs, sha256 } from '../auth/crypto.util';
-import { OtpRateLimitService } from '../auth/otp-rate-limit.service';
+import { RateLimitService } from '../auth/rate-limit.service';
 import {
   ADMIN_ACCOUNT_DISABLED,
   ADMIN_AUTH_AUDIENCE,
@@ -40,7 +40,7 @@ export class AdminAuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly rateLimit: OtpRateLimitService,
+    private readonly rateLimit: RateLimitService,
     private readonly audit: AuditService,
   ) {}
 

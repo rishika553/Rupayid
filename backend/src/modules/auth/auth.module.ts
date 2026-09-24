@@ -7,17 +7,14 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from '../user/user.module';
 import { ReferralsModule } from '../referrals/referrals.module';
-import { SmsModule } from './sms/sms.module';
-import { OtpAuthService } from './otp-auth.service';
-import { OtpGenerator } from './otp-generator';
-import { OtpRateLimitService } from './otp-rate-limit.service';
+import { SessionService } from './session.service';
+import { RateLimitService } from './rate-limit.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     UserModule,
     ReferralsModule,
-    SmsModule,
     NotificationsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
@@ -32,7 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, OtpAuthService, OtpGenerator, OtpRateLimitService, JwtStrategy],
-  exports: [AuthService, OtpAuthService, OtpRateLimitService],
+  providers: [AuthService, SessionService, RateLimitService, JwtStrategy],
+  exports: [AuthService, SessionService, RateLimitService],
 })
 export class AuthModule {}

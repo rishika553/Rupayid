@@ -4,15 +4,15 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { UserService } from '../../user/user.service';
-import { OtpAuthService } from '../otp-auth.service';
-import { BLOCKED_USER_STATUSES } from '../otp.constants';
+import { SessionService } from '../session.service';
+import { BLOCKED_USER_STATUSES } from '../auth.constants';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private readonly userService: UserService,
-    private readonly otpAuthService: OtpAuthService,
+    private readonly sessionService: SessionService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -51,7 +51,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (!token) {
         throw new UnauthorizedException('Authentication required');
       }
-      const session = await this.otpAuthService.assertAccessSession(user.id, payload.sid, token);
+      const session = await this.sessionService.assertAccessSession(user.id, payload.sid, token);
       familyId = session.familyId;
     }
 

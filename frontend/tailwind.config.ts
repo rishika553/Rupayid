@@ -51,6 +51,13 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        cta: {
+          DEFAULT: 'hsl(var(--cta))',
+          foreground: 'hsl(var(--cta-foreground))',
+        },
+      },
+      fontFamily: {
+        display: ['var(--font-jakarta)', 'Plus Jakarta Sans', 'Inter', 'sans-serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',

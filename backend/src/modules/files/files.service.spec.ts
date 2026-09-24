@@ -36,6 +36,10 @@ describe('FilesService', () => {
     expect(upload.objectKey).toMatch(/^kyc\/user-1\/kyc-1\/.+\.jpg$/);
   });
 
+  it('reports a missing local upload as not stored', async () => {
+    await expect(service().statObject('kyc/user-1/kyc-1/never-uploaded.pdf')).resolves.toBeNull();
+  });
+
   it('rejects path-traversal segments in object keys', () => {
     expect(() => service().buildObjectKey('../other', 'kyc-1', 'application/pdf')).toThrow(
       BadRequestException,

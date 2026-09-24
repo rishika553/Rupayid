@@ -4,7 +4,7 @@ import type Redis from 'ioredis';
 import { hasUsableRedisUrl, REDIS_CLIENT } from '../../common/redis/redis.module';
 
 @Injectable()
-export class OtpRateLimitService {
+export class RateLimitService {
   private readonly memory = new Map<string, { count: number; resetAt: number }>();
 
   constructor(

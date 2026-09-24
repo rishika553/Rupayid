@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { clientIp } from '../../common/http/client-ip';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { ConfirmKycDocumentDto, RequestKycUploadDto, UpsertKycDetailsDto } from './dto/kyc.dto';
 import { KycService } from './kyc.service';
 
@@ -68,55 +68,4 @@ export class KycController {
   async documentUrl(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
     return this.kycService.getDocumentDownloadUrl(user.id, id);
   }
-
-  @Post('applications')
-  @ApiOperation({ summary: 'Create or return the current KYC application' })
-  async createApplication(@CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
-    return this.kycService.createMine(user.id, clientIp(req), req.headers['user-agent']);
-  }
-
-  @Get('applications/my')
-  @ApiOperation({ summary: 'Get my KYC applications' })
-  async myApplications(@CurrentUser() user: CurrentUserPayload) {
-    return this.kycService.findByUser(user.id);
-  }
-
-  @Get('applications/pending')
-  @Roles('UNDERWRITER', 'ADMIN')
-  @ApiOperation({ summary: 'List pending KYC reviews' })
-  async pendingReviews() {
-    return this.kycService.listPendingReviews();
-  }
-
-  @Get('applications/:id')
-  @ApiOperation({ summary: 'Get a KYC application if the caller owns it or is staff' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
-    return this.kycService.findById(id, user.id);
-  }
-
-  @Post('applications/:id/submit')
-  @ApiOperation({ summary: 'Submit KYC (owner only)' })
-  async submitById(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
-    await this.kycService.findById(id, user.id);
-    return this.kycService.submitMine(user.id, clientIp(req), req.headers['user-agent']);
-  }
-
-  @Patch('applications/:id/review')
-  @Roles('UNDERWRITER', 'ADMIN')
-  @ApiOperation({ summary: 'Legacy staff review; admin portal is the supported approve/decline path' })
-  async review(
-    @Param('id') id: string,
-    @Body() data: { decision: string; reason?: string },
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.kycService.reviewDecision(id, { ...data, reviewedById: user.id });
-  }
-}
-
-function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || 'unknown';
 }

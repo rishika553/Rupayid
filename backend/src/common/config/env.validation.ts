@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, Matches, validateSync } from 'class-validator';
+import { IsEnum, IsOptional, IsString, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -38,12 +38,11 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
-  OTP_PEPPER!: string;
+  TRUST_PROXY_HOPS!: string;
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{6}$/)
-  DEV_OTP_CODE!: string;
+  ENABLE_SWAGGER!: string;
 
   @IsOptional()
   @IsString()

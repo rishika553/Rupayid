@@ -4,19 +4,6 @@ export function sha256(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-export function hashOtp(pepper: string, phone: string, otp: string): string {
-  return crypto.createHmac('sha256', pepper).update(`${phone}:${otp}`).digest('hex');
-}
-
-export function timingSafeEqualHex(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  if (a.length !== b.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(a, b);
-}
-
 export function parseDurationToMs(value: string): number {
   const match = /^(\d+)(ms|s|m|h|d)$/.exec(value);
   if (!match) {

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Patch, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { clientIp } from '../../common/http/client-ip';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CustomersService } from './customers.service';
@@ -27,12 +28,4 @@ export class CustomersController {
   ) {
     return this.customers.updateMine(user.id, dto, clientIp(req), req.headers['user-agent']);
   }
-}
-
-function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || 'unknown';
 }

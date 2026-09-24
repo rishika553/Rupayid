@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { clientIp } from '../../common/http/client-ip';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentAdmin } from './current-admin.decorator';
 import type { CurrentAdminPayload } from './current-admin.decorator';
@@ -34,12 +35,4 @@ export class AdminAuthController {
   async logout(@CurrentAdmin() admin: CurrentAdminPayload) {
     return this.adminAuthService.logout(admin);
   }
-}
-
-function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || 'unknown';
 }

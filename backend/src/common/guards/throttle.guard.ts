@@ -1,32 +1,23 @@
-import type { CanActivate, ExecutionContext} from '@nestjs/common';
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import type { CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import type { Request } from 'express';
+import { RateLimitService } from '../../modules/auth/rate-limit.service';
+import { clientIp } from '../http/client-ip';
 
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const MAX_REQUESTS_PER_WINDOW = 100;
+const WINDOW_MS = 60_000;
 
 @Injectable()
 export class ThrottleGuard implements CanActivate {
-  constructor(
-    private readonly maxRequests = 100,
-    private readonly windowMs = 60_000,
-  ) {}
+  constructor(private readonly rateLimit: RateLimitService) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const ip = request.ip || request.connection?.remoteAddress || 'unknown';
-    const now = Date.now();
-    const record = requestCounts.get(ip);
-
-    if (!record || now > record.resetTime) {
-      requestCounts.set(ip, { count: 1, resetTime: now + this.windowMs });
-      return true;
-    }
-
-    record.count++;
-
-    if (record.count > this.maxRequests) {
-      throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
-    }
-
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
+    await this.rateLimit.assertWithinLimit(
+      `throttle:ip:${clientIp(request)}`,
+      MAX_REQUESTS_PER_WINDOW,
+      WINDOW_MS,
+    );
     return true;
   }
 }

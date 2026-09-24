@@ -35,6 +35,7 @@ import { HealthModule } from './modules/health/health.module';
 import { SystemConfigModule } from './modules/config/config.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
+import { ThrottleGuard } from './common/guards/throttle.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -81,6 +82,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     DashboardModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottleGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: AdminAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

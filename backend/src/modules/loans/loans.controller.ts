@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { clientIp } from '../../common/http/client-ip';
 import { ApiPaginatedResponse } from '../../common/decorators/api-paginated.decorator';
 import type { PaginationDto } from '../../common/decorators/api-paginated.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -144,12 +145,4 @@ export class LoansController {
   ) {
     return this.loansService.reject(id, { reason: data.reason, rejectedById: user.id });
   }
-}
-
-function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || 'unknown';
 }

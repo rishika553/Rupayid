@@ -4,11 +4,18 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
+  PutObjectCommand,
+  S3Client,
+  S3ServiceException,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, rm } from 'fs/promises';
+import { mkdir, rm, stat } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -139,6 +146,33 @@ export class FilesService {
       downloadUrl,
       expiresInSeconds: SIGNED_URL_TTL_SECONDS,
     };
+  }
+
+  /** Returns null when nothing was uploaded under this key. `contentType` is null for local storage. */
+  async statObject(key: string): Promise<{ sizeBytes: number; contentType: string | null } | null> {
+    if (this.useLocalStorage()) {
+      try {
+        const info = await stat(this.localPath(key));
+        return info.isFile() ? { sizeBytes: info.size, contentType: null } : null;
+      } catch {
+        return null;
+      }
+    }
+    this.assertReady();
+    try {
+      const head = await (this.client as S3Client).send(
+        new HeadObjectCommand({ Bucket: this.bucket(), Key: key }),
+      );
+      return { sizeBytes: Number(head.ContentLength ?? 0), contentType: head.ContentType ?? null };
+    } catch (error) {
+      if (
+        error instanceof NotFound ||
+        (error instanceof S3ServiceException && error.$metadata?.httpStatusCode === 404)
+      ) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async deleteFile(key: string): Promise<void> {

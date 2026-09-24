@@ -11,7 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { UserService } from '../user/user.service';
 import { ReferralsService } from '../referrals/referrals.service';
-import { OtpAuthService } from './otp-auth.service';
+import { SessionService } from './session.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { verifyGoogleIdToken } from './google-id-token';
 import { sha256 } from './crypto.util';
@@ -26,7 +26,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly referrals: ReferralsService,
-    private readonly sessions: OtpAuthService,
+    private readonly sessions: SessionService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,

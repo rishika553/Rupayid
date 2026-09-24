@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { ThrottleGuard } from './common/guards/throttle.guard';
 import { parseCorsOrigins } from './common/config/app.config';
+import { hasUsableRedisUrl } from './common/redis/redis.module';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -14,7 +15,13 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
+  app.getHttpAdapter().getInstance().set('trust proxy', Number.isInteger(trustProxyHops) ? trustProxyHops : 1);
+
+  if (isProduction && !hasUsableRedisUrl(process.env.REDIS_URL)) {
+    logger.warn('REDIS_URL is not set: rate limits are per-instance only');
+  }
 
   // Security
   app.use(helmet());
@@ -45,10 +52,22 @@ async function bootstrap() {
     }),
   );
 
-  // Throttle guard (100 requests per minute)
-  app.useGlobalGuards(new ThrottleGuard(100, 60_000));
+  const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === 'true';
+  if (swaggerEnabled) {
+    setupSwagger(app);
+  }
 
-  // Swagger/OpenAPI
+  const port = process.env.PORT || 3001;
+  await app.listen(port);
+
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`API prefix: /${apiPrefix}`);
+  if (swaggerEnabled) {
+    logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  }
+}
+
+function setupSwagger(app: INestApplication) {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('RupayAid API')
     .setDescription('Production-grade lending platform API. Modular monolith backend.')
@@ -90,13 +109,6 @@ async function bootstrap() {
     customSiteTitle: 'RupayAid API Docs',
     customCss: '.swagger-ui .topbar { display: none }',
   });
-
-  const port = process.env.PORT || 3001;
-  await app.listen(port);
-
-  logger.log(`Application is running on: http://localhost:${port}`);
-  logger.log(`API prefix: /${apiPrefix}`);
-  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

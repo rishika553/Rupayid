@@ -22,10 +22,3 @@ export function normalizeIndianMobile(input: string): string {
 
   return e164;
 }
-
-export function maskPhone(phone: string): string {
-  if (phone.length < 8) {
-    return '****';
-  }
-  return `${phone.slice(0, 4)}****${phone.slice(-4)}`;
-}

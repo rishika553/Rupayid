@@ -4,12 +4,14 @@ export interface StoredAdminAuth {
   accessToken: string;
 }
 
+/** Staff sessions end when the tab closes. */
 function browserStorage(): Storage | null {
   if (typeof window === 'undefined') {
     return null;
   }
   try {
-    return window.localStorage;
+    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+    return window.sessionStorage;
   } catch {
     return null;
   }
