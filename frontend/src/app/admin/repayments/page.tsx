@@ -51,9 +51,9 @@ export default function AdminRepaymentsPage() {
         {overdue.length === 0 ? (
           <EmptyState title="No overdue installments" description="Schedules appear after a successful disbursement." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
+          <div className="portal-card overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
+              <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Customer</th>
                   <th className="px-4 py-3 font-medium">Application</th>
@@ -89,9 +89,9 @@ export default function AdminRepaymentsPage() {
         {payments.length === 0 ? (
           <EmptyState title="No payments yet" description="Customer repayments will appear here after checkout." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
+          <div className="portal-card overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
+              <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Customer</th>
                   <th className="px-4 py-3 font-medium">Application</th>

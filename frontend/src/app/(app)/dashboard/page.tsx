@@ -70,12 +70,12 @@ export default function DashboardPage() {
   const hasActiveLoan = Boolean(dashboard.loan.activeLoan);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <WelcomeSection dashboard={dashboard} />
 
       <SummaryCards dashboard={dashboard} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         <ApplicationTracker
           application={trackedApplication}
           isLoading={!dashboard.loan.currentApplication && loans.isLoading}
@@ -88,7 +88,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         <RepaymentOverview
           hasActiveLoan={hasActiveLoan}
           schedule={schedule.data}
@@ -98,7 +98,7 @@ export default function DashboardPage() {
         <ReferralCard referral={dashboard.referral} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         <RecentPayments payments={dashboard.payments.recent} hasActiveLoan={hasActiveLoan} />
       </div>
     </div>
@@ -114,7 +114,7 @@ function DashboardSkeleton() {
           <Skeleton key={index} className="h-[196px] rounded-[1.25rem]" />
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         <Skeleton className="h-72 rounded-[1.25rem] lg:col-span-2" />
         <Skeleton className="h-72 rounded-[1.25rem]" />
       </div>

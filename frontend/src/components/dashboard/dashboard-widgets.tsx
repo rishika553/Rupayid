@@ -55,19 +55,19 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn('portal-card flex flex-col p-5 sm:p-6', className)}>
-      <header className="mb-5 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
+    <section className={cn('portal-card flex flex-col p-4 sm:p-6', className)}>
+      <header className="mb-4 flex items-start justify-between gap-3 sm:mb-5">
+        <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
           {Icon ? (
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-emerald-700">
-              <Icon className="size-[18px]" aria-hidden />
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-emerald-700 sm:size-9 sm:rounded-xl">
+              <Icon className="size-4 sm:size-[18px]" aria-hidden />
             </span>
           ) : null}
           <div className="min-w-0">
-            <h2 className="font-display text-base font-bold tracking-[-0.02em] text-primary sm:text-lg">
+            <h2 className="font-display text-[15px] font-bold tracking-[-0.02em] text-primary sm:text-lg">
               {title}
             </h2>
-            {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
+            {description ? <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{description}</p> : null}
           </div>
         </div>
         {action}
@@ -81,7 +81,7 @@ function TextLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex shrink-0 items-center gap-1 rounded-md text-sm font-semibold text-emerald-700 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex shrink-0 items-center gap-1 rounded-md text-[13px] font-semibold sm:text-sm text-emerald-700 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {children}
       <ArrowRight className="size-4" aria-hidden />
@@ -104,7 +104,7 @@ export function CtaLink({
     <Link
       href={href}
       className={cn(
-        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-bold transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 motion-reduce:transform-none',
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-bold sm:px-5 sm:py-2.5 sm:text-sm transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 motion-reduce:transform-none',
         variant === 'cta'
           ? 'bg-cta text-cta-foreground shadow-[0_10px_25px_-12px_rgba(224,104,69,.7)] hover:bg-cta/90'
           : 'border border-border bg-white/80 text-primary hover:bg-white',
@@ -128,13 +128,13 @@ function EmptyBlock({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
-      <span className="grid size-11 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm">
-        <Icon className="size-5" aria-hidden />
+    <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-5 text-center sm:px-5 sm:py-8">
+      <span className="grid size-9 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm sm:size-11 sm:rounded-2xl">
+        <Icon className="size-4 sm:size-5" aria-hidden />
       </span>
-      <p className="mt-3 font-display font-bold text-primary">{title}</p>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
-      {action ? <div className="mt-4">{action}</div> : null}
+      <p className="mt-2.5 font-display text-sm font-bold text-primary sm:mt-3 sm:text-base">{title}</p>
+      <p className="mt-1 max-w-sm text-xs text-muted-foreground sm:text-sm">{description}</p>
+      {action ? <div className="mt-3 sm:mt-4">{action}</div> : null}
     </div>
   );
 }
@@ -160,7 +160,7 @@ export function WelcomeSection({ dashboard }: { dashboard: CustomerDashboard }) 
   }
 
   return (
-    <section className="portal-card portal-hero relative overflow-hidden p-6 sm:p-8">
+    <section className="portal-card portal-hero relative overflow-hidden p-4 sm:p-8">
       <div
         className="pointer-events-none absolute -right-16 -top-16 hidden size-64 rounded-full border border-emerald-200/60 sm:block"
         aria-hidden
@@ -169,17 +169,17 @@ export function WelcomeSection({ dashboard }: { dashboard: CustomerDashboard }) 
         className="pointer-events-none absolute -right-4 top-10 hidden size-40 rounded-full border border-emerald-200/50 sm:block"
         aria-hidden
       />
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
             {greeting()}
           </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-[-0.045em] text-primary sm:text-4xl">
+          <h1 className="mt-1.5 font-display text-2xl font-extrabold leading-tight tracking-[-0.04em] text-primary sm:mt-2 sm:text-4xl sm:tracking-[-0.045em]">
             Welcome back, {dashboard.customer.firstName || 'there'}
           </h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">{message}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground sm:mt-3 sm:text-base sm:leading-7">{message}</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           <CtaLink href="/loans/apply">
             Apply for a loan <ArrowRight className="size-4" aria-hidden />
           </CtaLink>
@@ -232,23 +232,23 @@ function SummaryCard({
   return (
     <article
       className={cn(
-        'portal-card portal-card-interactive flex h-full min-h-[196px] flex-col p-5',
+        'portal-card portal-card-interactive flex h-full flex-col p-4 sm:min-h-[196px] sm:p-5',
         highlight === 'warning' && 'border-amber-200',
         highlight === 'danger' && 'border-red-200',
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <span className="grid size-8 place-items-center rounded-lg bg-secondary text-emerald-700">
-            <Icon className="size-4" aria-hidden />
+        <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground sm:text-sm">
+          <span className="grid size-7 place-items-center rounded-lg bg-secondary text-emerald-700 sm:size-8">
+            <Icon className="size-3.5 sm:size-4" aria-hidden />
           </span>
           {label}
         </span>
         {badge}
       </div>
-      <div className="mt-4 font-display text-2xl font-extrabold tracking-[-0.03em] text-primary">{value}</div>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p>
-      <div className="mt-auto pt-4">
+      <div className="mt-3 font-display text-lg font-extrabold tracking-[-0.03em] text-primary sm:mt-4 sm:text-2xl">{value}</div>
+      <p className="mt-0.5 text-xs leading-5 text-muted-foreground sm:mt-1 sm:text-sm sm:leading-6">{detail}</p>
+      <div className="mt-auto pt-3 sm:pt-4">
         <TextLink href={href}>{linkLabel}</TextLink>
       </div>
     </article>
@@ -272,7 +272,7 @@ export function SummaryCards({ dashboard }: { dashboard: CustomerDashboard }) {
   const kycTone = statusTone(kyc.status);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       <SummaryCard
         icon={ShieldCheck}
         label="KYC"
@@ -451,19 +451,19 @@ export function ApplicationTracker({
     >
       <div
         className={cn(
-          'mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3',
+          'mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 sm:mb-6 sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3',
           terminalFailure ? 'bg-red-50' : closed || status === 'ACTIVE' ? 'bg-emerald-50' : 'bg-secondary/60',
         )}
       >
         <div>
-          <p className="text-sm font-semibold text-primary">
+          <p className="text-xs font-semibold text-primary sm:text-sm">
             {STATUS_MESSAGES[status] || `Status: ${statusLabel(status)}`}
           </p>
-          {reason ? <p className="mt-0.5 text-sm text-red-800">Reason: {reason}</p> : null}
+          {reason ? <p className="mt-0.5 text-xs text-red-800 sm:text-sm">Reason: {reason}</p> : null}
         </div>
         <div className="flex items-center gap-3">
           {application.amount !== undefined ? (
-            <span className="font-display text-lg font-extrabold text-primary">{formatInr(application.amount)}</span>
+            <span className="font-display text-base font-extrabold text-primary sm:text-lg">{formatInr(application.amount)}</span>
           ) : null}
           <Badge tone={statusTone(status)}>{statusLabel(status)}</Badge>
         </div>
@@ -481,7 +481,7 @@ export function ApplicationTracker({
                   : 'upcoming';
           const isLast = index === WORKFLOW.length - 1;
           return (
-            <li key={step.status} className="relative flex gap-3 pb-5 md:flex-col md:items-center md:gap-2 md:pb-0 md:text-center">
+            <li key={step.status} className="relative flex gap-3 pb-3.5 sm:pb-5 md:flex-col md:items-center md:gap-2 md:pb-0 md:text-center">
               {!isLast ? (
                 <span
                   className={cn(
@@ -513,7 +513,7 @@ export function ApplicationTracker({
               <span className="pt-1 md:pt-0">
                 <span
                   className={cn(
-                    'block text-sm font-medium leading-tight md:text-xs',
+                    'block text-[13px] font-medium leading-tight sm:text-sm md:text-xs',
                     state === 'upcoming' ? 'text-muted-foreground' : 'text-primary',
                     state === 'failed' && 'text-red-700',
                   )}
@@ -706,18 +706,18 @@ export function RepaymentOverview({
       {upcoming.length ? (
         <ul className="mt-5 divide-y divide-border/70 rounded-2xl border border-border/80">
           {upcoming.map((item) => (
-            <li key={item.installmentNumber} className="flex items-center justify-between gap-3 px-4 py-3">
+            <li key={item.installmentNumber} className="flex items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted font-display text-sm font-bold text-primary">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted font-display text-xs font-bold text-primary sm:size-9 sm:rounded-xl sm:text-sm">
                   {item.installmentNumber}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-primary">Installment {item.installmentNumber}</p>
+                  <p className="text-[13px] font-semibold text-primary sm:text-sm">Installment {item.installmentNumber}</p>
                   <p className="text-xs text-muted-foreground">Due {formatDate(item.dueDate)}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-right">
-                <span className="text-sm font-bold text-primary">{formatInr(item.outstanding)}</span>
+              <div className="flex items-center gap-2 text-right sm:gap-3">
+                <span className="text-[13px] font-bold text-primary sm:text-sm">{formatInr(item.outstanding)}</span>
                 <Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge>
               </div>
             </li>
@@ -744,9 +744,9 @@ export function RepaymentOverview({
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'success' }) {
   return (
-    <div className="rounded-2xl bg-muted/60 px-4 py-3">
+    <div className="rounded-xl bg-muted/60 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 font-display text-lg font-extrabold', tone === 'success' ? 'text-emerald-700' : 'text-primary')}>
+      <p className={cn('mt-0.5 font-display text-base font-extrabold sm:mt-1 sm:text-lg', tone === 'success' ? 'text-emerald-700' : 'text-primary')}>
         {value}
       </p>
     </div>
@@ -772,7 +772,7 @@ export function ReferralCard({ referral }: { referral: CustomerDashboard['referr
   }
 
   return (
-    <section className="portal-card portal-navy relative flex flex-col overflow-hidden border-transparent p-6 text-white">
+    <section className="portal-card portal-navy relative flex flex-col overflow-hidden border-transparent p-4 text-white sm:p-6">
       <div
         className="pointer-events-none absolute -bottom-20 -right-16 size-56 rounded-full border border-emerald-300/30 shadow-[0_0_0_28px_rgba(110,231,183,.07),0_0_0_56px_rgba(110,231,183,.04)]"
         aria-hidden
@@ -782,16 +782,16 @@ export function ReferralCard({ referral }: { referral: CustomerDashboard['referr
           <Gift className="size-[18px] text-emerald-300" aria-hidden />
         </span>
         <div>
-          <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Referral program</h2>
-          <p className="text-sm text-white/65">Invite friends with your personal code.</p>
+          <h2 className="font-display text-[15px] font-bold tracking-[-0.02em] sm:text-lg">Referral program</h2>
+          <p className="text-xs text-white/65 sm:text-sm">Invite friends with your personal code.</p>
         </div>
       </div>
 
-      <div className="relative mt-6">
+      <div className="relative mt-4 sm:mt-6">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Your code</p>
         {referral.code ? (
-          <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-            <span className="font-mono text-xl font-bold tracking-wider">{referral.code}</span>
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 sm:rounded-2xl sm:px-4 sm:py-3">
+            <span className="font-mono text-base font-bold tracking-wider sm:text-xl">{referral.code}</span>
             <button
               type="button"
               onClick={() => void copyCode()}
@@ -807,24 +807,24 @@ export function ReferralCard({ referral }: { referral: CustomerDashboard['referr
         )}
       </div>
 
-      <dl className="relative mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-white/10 px-4 py-3">
+      <dl className="relative mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+        <div className="rounded-xl bg-white/10 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
           <dt className="text-xs text-white/65">Referred</dt>
-          <dd className="mt-1 font-display text-2xl font-extrabold">{referral.referredCount}</dd>
+          <dd className="mt-0.5 font-display text-xl font-extrabold sm:mt-1 sm:text-2xl">{referral.referredCount}</dd>
         </div>
-        <div className="rounded-2xl bg-white/10 px-4 py-3">
+        <div className="rounded-xl bg-white/10 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
           <dt className="text-xs text-white/65">Converted</dt>
-          <dd className="mt-1 font-display text-2xl font-extrabold text-emerald-300">{referral.convertedCount}</dd>
+          <dd className="mt-0.5 font-display text-xl font-extrabold text-emerald-300 sm:mt-1 sm:text-2xl">{referral.convertedCount}</dd>
         </div>
       </dl>
       {referral.referredBy ? (
         <p className="relative mt-3 text-xs text-white/65">Invited by {referral.referredBy}</p>
       ) : null}
 
-      <div className="relative mt-auto pt-5">
+      <div className="relative mt-auto pt-4 sm:pt-5">
         <Link
           href="/referral"
-          className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+          className="inline-flex items-center gap-1 text-[13px] font-semibold sm:text-sm text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
         >
           Open referral program <ArrowRight className="size-4" aria-hidden />
         </Link>
@@ -887,10 +887,10 @@ export function RecentPayments({
               <li key={payment.id} className="flex items-center justify-between gap-3 py-3 first:pt-0">
                 <div className="min-w-0">
                   <PaymentLabel type={payment.type} method={payment.method} />
-                  <p className="mt-1 pl-12 text-xs text-muted-foreground">{formatDateTime(payment.createdAt)}</p>
+                  <p className="mt-1 pl-11 text-xs text-muted-foreground sm:pl-12">{formatDateTime(payment.createdAt)}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="font-bold text-primary">{formatInr(payment.amount)}</p>
+                  <p className="text-sm font-bold text-primary sm:text-base">{formatInr(payment.amount)}</p>
                   <Badge tone={statusTone(payment.status)} className="mt-1">
                     {statusLabel(payment.status)}
                   </Badge>
@@ -922,14 +922,14 @@ function PaymentLabel({ type, method }: { type: string; method: string }) {
     <div className="flex items-center gap-3">
       <span
         className={cn(
-          'grid size-9 shrink-0 place-items-center rounded-xl',
+          'grid size-8 shrink-0 place-items-center rounded-lg sm:size-9 sm:rounded-xl',
           incoming ? 'bg-emerald-50 text-emerald-700' : 'bg-accent text-primary',
         )}
       >
         <Icon className="size-4" aria-hidden />
       </span>
       <div className="min-w-0">
-        <p className="truncate font-semibold text-primary">{statusLabel(type)}</p>
+        <p className="truncate text-sm font-semibold text-primary sm:text-base">{statusLabel(type)}</p>
         <p className="text-xs text-muted-foreground">{method.replace(/_/g, ' ')}</p>
       </div>
     </div>

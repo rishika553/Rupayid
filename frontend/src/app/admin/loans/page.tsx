@@ -38,7 +38,7 @@ export default function AdminLoansPage() {
         }}
       >
         <select
-          className="h-10 rounded-md border bg-background px-3 text-sm"
+          className="h-10 rounded-xl border bg-card px-3 text-sm"
           value={status}
           onChange={(event) => setStatus(event.target.value)}
         >
@@ -65,9 +65,9 @@ export default function AdminLoansPage() {
         <EmptyState title="No loan applications" description="Nothing matches this filter." />
       ) : null}
       {query.data && query.data.data.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border bg-card">
+        <div className="portal-card overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b bg-muted/40 text-muted-foreground">
+            <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Application</th>

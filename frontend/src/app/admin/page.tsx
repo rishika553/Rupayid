@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@rupayaid/ui';
+import { ShieldCheck } from 'lucide-react';
+import { Logo } from '@/components/brand/logo';
 import { Label } from '@/components/ui/label';
 import { useAdminAuth } from '@/components/providers/admin-auth-provider';
 
@@ -44,11 +46,22 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <main className="portal-hero flex min-h-screen flex-col items-center justify-center gap-6 p-4">
+      <div className="flex items-center gap-2">
+        <Logo href="/admin" />
+        <span className="rounded-full bg-primary px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-foreground">
+          Admin
+        </span>
+      </div>
+      <Card className="portal-card w-full max-w-md">
         <CardHeader>
-          <CardTitle>Admin sign in</CardTitle>
-          <CardDescription>RupayAid Admin Portal. Use your staff username and password.</CardDescription>
+          <div className="mb-2 grid size-10 place-items-center rounded-xl bg-secondary text-emerald-700">
+            <ShieldCheck className="size-5" aria-hidden />
+          </div>
+          <CardTitle className="font-display text-2xl font-extrabold tracking-[-0.03em] text-primary">
+            Admin sign in
+          </CardTitle>
+          <CardDescription>Use your staff username and password.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -85,7 +98,11 @@ export default function AdminLoginPage() {
                 {formError}
               </p>
             ) : null}
-            <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
+            <Button
+              className="w-full rounded-full bg-cta font-bold text-cta-foreground hover:bg-cta/90"
+              type="submit"
+              disabled={form.formState.isSubmitting}
+            >
               {form.formState.isSubmitting ? 'Signing in…' : 'Sign In'}
             </Button>
           </form>

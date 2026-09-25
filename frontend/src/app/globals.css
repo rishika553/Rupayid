@@ -59,7 +59,7 @@
 }
 
 .portal-card {
-  border-radius: 1.25rem;
+  border-radius: 1rem;
   border: 1px solid hsl(var(--border) / 0.9);
   background: hsl(var(--card));
   box-shadow:
@@ -69,6 +69,12 @@
     box-shadow 0.2s ease,
     transform 0.2s ease,
     border-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .portal-card {
+    border-radius: 1.25rem;
+  }
 }
 
 .portal-card-interactive:hover {

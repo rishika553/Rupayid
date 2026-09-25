@@ -17,21 +17,25 @@ import {
   LifeBuoy,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   ShieldCheck,
   X,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { cn } from '@rupayaid/ui';
 import { Logo } from '@/components/brand/logo';
+import {
+  NavGroup,
+  NavSectionLabel,
+  SidebarToggle,
+  initialsOf,
+  isActive,
+  useCollapsedSidebar,
+} from '@/components/layout/sidebar';
+import type { NavItem } from '@/components/layout/sidebar';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Badge, statusTone } from '@/components/ui/badge';
 import { useCustomerDashboard } from '@/hooks/use-customer-data';
 import { kycStatusLabel } from '@/lib/kyc';
-
-type NavItem = { href: string; label: string; icon: LucideIcon };
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const dashboard = useCustomerDashboard().data;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, toggleCollapsed] = useCollapsedSidebar(COLLAPSED_KEY);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const firstName = user?.firstName || dashboard?.customer.firstName || '';
@@ -63,19 +67,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const kycStatus = dashboard?.kyc.status;
 
   useEffect(() => {
-    setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === '1');
-  }, []);
-
-  useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
-
-  function toggleCollapsed() {
-    setCollapsed((current) => {
-      window.localStorage.setItem(COLLAPSED_KEY, current ? '0' : '1');
-      return !current;
-    });
-  }
 
   async function signOut() {
     await logout();
@@ -165,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main id="main" className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>
@@ -217,84 +210,10 @@ function SidebarNav({ pathname, collapsed }: { pathname: string; collapsed: bool
     <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-5" aria-label="Customer">
       <NavGroup items={NAV} pathname={pathname} collapsed={collapsed} />
       <div>
-        {collapsed ? (
-          <div className="mx-auto mb-3 h-px w-8 bg-border" />
-        ) : (
-          <p className="mb-2 px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Account
-          </p>
-        )}
+        <NavSectionLabel collapsed={collapsed}>Account</NavSectionLabel>
         <NavGroup items={SECONDARY_NAV} pathname={pathname} collapsed={collapsed} />
       </div>
     </nav>
-  );
-}
-
-function NavGroup({
-  items,
-  pathname,
-  collapsed,
-}: {
-  items: NavItem[];
-  pathname: string;
-  collapsed: boolean;
-}) {
-  return (
-    <ul className="space-y-1">
-      {items.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <li key={href}>
-            <Link
-              href={href}
-              title={collapsed ? label : undefined}
-              aria-label={collapsed ? label : undefined}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                collapsed && 'justify-center px-0',
-                active && 'bg-secondary text-primary',
-              )}
-            >
-              {active ? (
-                <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-emerald-500" aria-hidden />
-              ) : null}
-              <Icon
-                className={cn('size-5 shrink-0', active ? 'text-emerald-600' : 'text-muted-foreground group-hover:text-primary')}
-                aria-hidden
-              />
-              {collapsed ? null : <span className="truncate">{label}</span>}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function SidebarToggle({
-  collapsed,
-  onToggle,
-  className,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-  className?: string;
-}) {
-  const Icon = collapsed ? PanelLeftOpen : PanelLeftClose;
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      className={cn(
-        'grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        className,
-      )}
-    >
-      <Icon className="size-[18px]" />
-    </button>
   );
 }
 
@@ -309,12 +228,7 @@ function AccountMenu({
   onProfile: boolean;
   onLogout: () => void;
 }) {
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'R';
+  const initials = initialsOf(name);
 
   return (
     <DropdownMenu.Root>
@@ -363,8 +277,4 @@ function AccountMenu({
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
-}
-
-function isActive(pathname: string, href: string) {
-  return pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
 }

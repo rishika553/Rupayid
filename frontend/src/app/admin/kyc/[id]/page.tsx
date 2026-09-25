@@ -198,7 +198,7 @@ export default function AdminKycDetailPage() {
               </Dialog.Trigger>
               <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-card p-6 shadow-lg">
+                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 portal-root min-h-0 rounded-2xl border bg-card p-6 shadow-lg">
                   <Dialog.Title className="text-lg font-semibold">Accept application</Dialog.Title>
                   <Dialog.Description className="mt-2 text-sm text-muted-foreground">
                     Are you sure you want to accept this KYC application?
@@ -231,7 +231,7 @@ export default function AdminKycDetailPage() {
               </Dialog.Trigger>
               <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-card p-6 shadow-lg">
+                <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 portal-root min-h-0 rounded-2xl border bg-card p-6 shadow-lg">
                   <Dialog.Title className="text-lg font-semibold">Decline application</Dialog.Title>
                   <Dialog.Description className="mt-2 text-sm text-muted-foreground">
                     Provide a reason. This is saved with the KYC review.
