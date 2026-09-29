@@ -3,9 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
 import type {
+  CheckoutConfirmation,
   CreateProviderOrderInput,
   CreateProviderOrderResult,
   PaymentProvider,
+  ProviderPaymentStatus,
   ProviderWebhookEvent,
 } from './payment-provider';
 
@@ -63,12 +65,7 @@ export class RazorpayProvider implements PaymentProvider {
       throw new BadRequestException('Missing payment signature');
     }
     const body = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
-    const expected = createHmac('sha256', secret).update(body).digest('hex');
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    const actualBuf = Buffer.from(signature, 'utf8');
-    if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
-      throw new BadRequestException('Invalid payment signature');
-    }
+    assertSignature(createHmac('sha256', secret).update(body).digest('hex'), signature);
 
     const event = JSON.parse(body) as RazorpayWebhookPayload;
     const payment = event.payload?.payment?.entity;
@@ -90,6 +87,43 @@ export class RazorpayProvider implements PaymentProvider {
     };
   }
 
+  verifyCheckoutSignature(input: CheckoutConfirmation): void {
+    const keySecret = this.require('RAZORPAY_KEY_SECRET');
+    const expected = createHmac('sha256', keySecret)
+      .update(`${input.orderId}|${input.providerPaymentId}`)
+      .digest('hex');
+    assertSignature(expected, input.signature);
+  }
+
+  async fetchPayment(providerPaymentId: string): Promise<ProviderPaymentStatus> {
+    const keyId = this.require('RAZORPAY_KEY_ID');
+    const keySecret = this.require('RAZORPAY_KEY_SECRET');
+    const response = await fetch(`${API_BASE}/payments/${encodeURIComponent(providerPaymentId)}`, {
+      headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}` },
+    });
+    const payment = (await response.json().catch(() => ({}))) as RazorpayPaymentEntity & {
+      status?: string;
+      error?: { description?: string };
+    };
+    if (!response.ok || !payment.id) {
+      throw new ServiceUnavailableException(payment.error?.description || 'Payment provider could not confirm the payment');
+    }
+    return {
+      providerPaymentId: payment.id,
+      orderId: payment.order_id,
+      status: payment.status === 'captured' ? 'SUCCESS' : payment.status === 'failed' ? 'FAILED' : 'PENDING',
+      amountMinor: payment.amount != null ? String(payment.amount) : undefined,
+      method: payment.method,
+      failureReason: payment.error_description || undefined,
+    };
+  }
+
+  isTestMode(): boolean | null {
+    const keyId = this.config.get<string>('RAZORPAY_KEY_ID');
+    if (!keyId) return null;
+    return keyId.startsWith('rzp_test_');
+  }
+
   private require(key: string): string {
     const value = this.config.get<string>(key);
     if (!value) {
@@ -107,20 +141,28 @@ export function toPaise(amount: Prisma.Decimal): number {
   return paise.toNumber();
 }
 
+function assertSignature(expected: string, actual: string) {
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const actualBuf = Buffer.from(actual, 'utf8');
+  if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
+    throw new BadRequestException('Invalid payment signature');
+  }
+}
+
+type RazorpayPaymentEntity = {
+  id?: string;
+  order_id?: string;
+  amount?: number;
+  method?: string;
+  error_description?: string;
+};
+
 type RazorpayWebhookPayload = {
   id?: string;
   event_id?: string;
   event?: string;
   payload?: {
-    payment?: {
-      entity?: {
-        id?: string;
-        order_id?: string;
-        amount?: number;
-        method?: string;
-        error_description?: string;
-      };
-    };
+    payment?: { entity?: RazorpayPaymentEntity };
     order?: { entity?: { id?: string } };
   };
 };

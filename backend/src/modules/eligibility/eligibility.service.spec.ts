@@ -142,6 +142,33 @@ describe('EligibilityService.evaluate', () => {
     });
   });
 
+  it('uses the monthly income declared on the application when the profile has none', async () => {
+    const incomeRule = {
+      id: 'rule-income',
+      key: 'min_income',
+      ruleType: 'INCOME',
+      operator: 'GREATER_THAN_OR_EQUAL',
+      value: 15000,
+      version: 1,
+      appliedVersionId: null,
+      versions: [{ id: 'ver-income', version: 1, status: 'ACTIVE', ruleJson: null }],
+    };
+    const user = {
+      profile: { yearlyIncome: null, city: 'Mumbai', dateOfBirth: new Date('1990-01-15') },
+      kycApplications: [],
+    };
+    const { svc } = service({ user, rules: [incomeRule] });
+    await expect(svc.evaluate('user-1', 'prod-1', { monthlyIncome: 40000 })).resolves.toMatchObject({
+      eligible: true,
+      status: 'ELIGIBLE',
+    });
+    await expect(svc.evaluate('user-1', 'prod-1', { monthlyIncome: 9000 })).resolves.toMatchObject({
+      eligible: false,
+      status: 'NOT_ELIGIBLE',
+      category: 'INCOME',
+    });
+  });
+
   it('hides inactive products', async () => {
     const { svc } = service({ product: { id: 'prod-off', isActive: false } });
     await expect(svc.evaluate('user-1', 'prod-off')).rejects.toBeInstanceOf(NotFoundException);

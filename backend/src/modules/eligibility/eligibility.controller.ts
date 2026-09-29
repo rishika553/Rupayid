@@ -39,7 +39,10 @@ export class EligibilityController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: EvaluateEligibilityDto,
   ) {
-    return this.eligibilityService.evaluate(user.id, dto.loanProductId);
+    return this.eligibilityService.evaluate(user.id, dto.loanProductId, {
+      monthlyIncome: dto.monthlyIncome,
+      employmentType: dto.employmentType,
+    });
   }
 
   @Get('evaluations/my')

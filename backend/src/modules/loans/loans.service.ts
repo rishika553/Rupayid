@@ -198,7 +198,11 @@ export class LoansService {
     this.assertAmountAndTenure(product, Number(app.amountRequested), app.tenureMonths);
     await this.assertKycReady(userId);
 
-    const eligibility = await this.eligibility.evaluate(userId, app.loanProductId);
+    const declared = asRecord(app.metadata);
+    const eligibility = await this.eligibility.evaluate(userId, app.loanProductId, {
+      monthlyIncome: declared.monthlyIncome != null ? Number(declared.monthlyIncome) : null,
+      employmentType: typeof declared.employmentType === 'string' ? declared.employmentType : null,
+    });
     await this.prisma.eligibilityEvaluation.update({
       where: { id: eligibility.reference },
       data: { loanApplicationId: app.id },

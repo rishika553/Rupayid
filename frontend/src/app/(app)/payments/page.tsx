@@ -14,6 +14,7 @@ import {
   useMyPayments,
   useMyTrackedLoans,
   usePayment,
+  useVerifyRepaymentPayment,
 } from '@/hooks/use-customer-data';
 import { formatDate, formatInr, statusLabel } from '@/lib/format';
 import { openRazorpayCheckout } from '@/lib/razorpay-checkout';
@@ -42,6 +43,7 @@ function PaymentsScreen() {
   const paymentsQuery = useMyPayments();
   const loansQuery = useMyTrackedLoans();
   const create = useCreateRepaymentPayment();
+  const verify = useVerifyRepaymentPayment();
   const loans = asLoanList(loansQuery.data).filter(
     (loan) => PAYABLE_LOAN_STATUSES.has(loan.status) || Number(loan.outstandingAmount) > 0,
   );
@@ -97,15 +99,35 @@ function PaymentsScreen() {
       });
       setActivePaymentId(payment.id);
       if (payment.checkout) {
-        await openRazorpayCheckout({
+        const result = await openRazorpayCheckout({
           keyId: payment.checkout.keyId,
           orderId: payment.checkout.orderId,
           amountMinor: payment.checkout.amountMinor,
           currency: payment.checkout.currency,
+          description: `Installment ${selectedInstallment.installmentNumber}`,
           name: user ? `${user.firstName} ${user.lastName}` : undefined,
           email: user?.email,
           contact: user?.phoneNumber,
         });
+        if (result.status === 'success') {
+          try {
+            await verify.mutateAsync({
+              paymentId: payment.id,
+              razorpayOrderId: result.response.razorpay_order_id,
+              razorpayPaymentId: result.response.razorpay_payment_id,
+              razorpaySignature: result.response.razorpay_signature,
+            });
+          } catch {
+            toast({
+              title: 'Confirming your payment',
+              description: 'We received your payment and are waiting for the bank to confirm it.',
+            });
+          }
+        } else if (result.status === 'failed') {
+          toast({ title: 'Payment failed', description: result.reason, variant: 'destructive' });
+        } else {
+          toast({ title: 'Payment not completed', description: 'You closed the payment window. You can try again.' });
+        }
       } else {
         toast({
           title: 'Payment started',
@@ -205,10 +227,10 @@ function PaymentsScreen() {
                 </div>
                 <Button
                   type="button"
-                  disabled={create.isPending || !selectedInstallment}
+                  disabled={create.isPending || verify.isPending || !selectedInstallment}
                   onClick={() => void onPay()}
                 >
-                  {create.isPending ? 'Starting…' : 'Pay now'}
+                  {create.isPending ? 'Starting…' : verify.isPending ? 'Confirming…' : 'Pay now'}
                 </Button>
               </>
             )}

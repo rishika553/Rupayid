@@ -245,7 +245,7 @@ async function main() {
       name: 'Personal Loan 1L 12M',
       description: 'A short-tenure personal loan for everyday needs.',
       minAmount: 50000,
-      maxAmount: 200000,
+      maxAmount: 100000,
       minTenureMonths: 6,
       maxTenureMonths: 12,
       baseInterestRate: 0.12,
@@ -261,12 +261,13 @@ async function main() {
       maxTenureMonths: 36,
       baseInterestRate: 0.105,
       processingFeeRate: 0.0075,
+      isActive: false,
     },
     {
       code: 'SL-50K-6M',
       name: 'Small Loan 50K 6M',
       description: 'A smaller personal loan for short-term expenses.',
-      minAmount: 10000,
+      minAmount: 1000,
       maxAmount: 50000,
       minTenureMonths: 3,
       maxTenureMonths: 6,
@@ -299,17 +300,17 @@ async function main() {
     { name: 'minimum_age', key: 'min_age', ruleType: 'AGE' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 21, description: 'Borrower must be 21+' },
     { name: 'maximum_age', key: 'max_age', ruleType: 'AGE' as const, operator: 'LESS_THAN_OR_EQUAL' as const, value: 58, description: 'Borrower must be 58 or younger at loan end' },
     { name: 'minimum_income', key: 'min_income', ruleType: 'INCOME' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 15000, description: 'Min monthly income ₹15K' },
-    { name: 'minimum_credit_score', key: 'min_credit_score', ruleType: 'CREDIT_SCORE' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 650, description: 'Minimum CIBIL score 650' },
+    { name: 'minimum_credit_score', key: 'min_credit_score', ruleType: 'CREDIT_SCORE' as const, operator: 'GREATER_THAN_OR_EQUAL' as const, value: 650, description: 'Minimum CIBIL score 650', status: 'INACTIVE' as const },
   ];
 
   const createdRules = [];
-  for (const r of rules) {
+  for (const { status, ...r } of rules as Array<(typeof rules)[number] & { status?: 'ACTIVE' | 'INACTIVE' }>) {
     const created = await prisma.eligibilityRule.upsert({
       where: { key: r.key },
       create: {
         ...r,
         value: JSON.stringify(r.value),
-        status: 'ACTIVE',
+        status: status ?? 'ACTIVE',
         version: 1,
         appliedVersionId: null,
         createdBy: 'system',

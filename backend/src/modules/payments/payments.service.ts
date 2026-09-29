@@ -190,7 +190,7 @@ export class PaymentsService {
       return { received: true, ignored: true };
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       try {
         await webhookEvents(tx).create({
           data: {
@@ -212,84 +212,185 @@ export class PaymentsService {
       if (!payment) {
         throw new NotFoundException('Payment not found');
       }
-      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${payment.id} FOR UPDATE`;
       await webhookEvents(tx).updateMany({
         where: { provider: this.provider.name, eventId: event.eventId },
         data: { paymentId: payment.id },
       });
 
-      if (payment.status === 'SUCCESS') {
-        return { received: true, duplicate: true, paymentId: payment.id };
-      }
-
-      if (event.status === 'FAILED') {
-        if (OPEN_PAYMENT.includes(payment.status)) {
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: {
-              status: 'FAILED',
-              failedAt: new Date(),
-              refusalReason: event.failureReason || 'Payment failed',
-              externalId: event.providerPaymentId || payment.externalId,
-            },
-          });
-        }
-        return { received: true, paymentId: payment.id, status: 'FAILED' };
-      }
-
-      const expectedMinor = money(payment.amount).mul(100);
-      if (!event.amountMinor || !expectedMinor.eq(event.amountMinor)) {
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: 'DISPUTED', refusalReason: 'Provider amount did not match' },
-        });
-        throw new BadRequestException('Payment amount mismatch');
-      }
-
-      await this.settleSuccessfulPayment(tx, payment, event.providerPaymentId);
-      return { received: true, paymentId: payment.id, status: 'SUCCESS' };
-    }).then(async (result) => {
-      if (result.status === 'SUCCESS' && result.paymentId) {
-        const payment = await this.prisma.payment.findUnique({ where: { id: result.paymentId } });
-        if (payment?.userId) {
-          await this.notifications.publish({
-            eventType: 'REPAYMENT_SUCCESSFUL',
-            userId: payment.userId,
-            referenceId: payment.id,
-            dedupeKey: `repayment-successful:${payment.id}`,
-            variables: { amount: money(payment.amount).toFixed(2) },
-          });
-          await this.audit.log({
-            actionType: 'PAYMENT',
-            entityType: 'Payment',
-            entityId: payment.id,
-            changedForUserId: payment.userId,
-            message: 'Repayment settled from provider webhook',
-            metadata: { amount: String(payment.amount), gateway: payment.gateway },
-          });
-        }
-      }
-      if (result.status === 'FAILED' && result.paymentId) {
-        const payment = await this.prisma.payment.findUnique({ where: { id: result.paymentId } });
-        await this.audit.log({
-          actionType: 'PAYMENT_FAILED',
-          entityType: 'Payment',
-          entityId: result.paymentId,
-          severity: 'MEDIUM',
-          message: 'Provider reported payment failure',
-        });
-        if (payment?.userId) {
-          await this.notifications.publish({
-            eventType: 'PAYMENT_FAILED',
-            userId: payment.userId,
-            referenceId: payment.id,
-            dedupeKey: `payment-failed:${payment.id}:webhook`,
-            variables: { amount: money(payment.amount).toFixed(2) },
-          });
-        }
-      }
-      return result;
+      const outcome = await this.applyProviderOutcome(tx, payment.id, {
+        status: event.status as 'SUCCESS' | 'FAILED',
+        providerPaymentId: event.providerPaymentId,
+        amountMinor: event.amountMinor,
+        method: event.method,
+        failureReason: event.failureReason,
+      });
+      return { received: true, ...outcome };
     });
+
+    if ('paymentId' in result && result.paymentId) {
+      await this.afterProviderOutcome(result, 'webhook');
+    }
+    return result;
+  }
+
+  async verifyCustomerPayment(
+    userId: string,
+    paymentId: string,
+    input: { orderId: string; providerPaymentId: string; signature: string },
+  ) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment || payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
+    }
+    if (!payment.gatewayRef || payment.gatewayRef !== input.orderId) {
+      throw new BadRequestException('Payment does not match this order');
+    }
+    this.provider.verifyCheckoutSignature(input);
+
+    if (payment.status === 'SUCCESS') {
+      return this.toCustomerView(payment);
+    }
+
+    const remote = await this.provider.fetchPayment(input.providerPaymentId);
+    if (remote.orderId !== payment.gatewayRef) {
+      throw new BadRequestException('Payment does not match this order');
+    }
+    if (remote.status === 'PENDING') {
+      return this.toCustomerView(payment, { includeCheckout: OPEN_PAYMENT.includes(payment.status) });
+    }
+
+    const outcome = await this.prisma.$transaction((tx) =>
+      this.applyProviderOutcome(tx, payment.id, {
+        status: remote.status as 'SUCCESS' | 'FAILED',
+        providerPaymentId: remote.providerPaymentId,
+        amountMinor: remote.amountMinor,
+        method: remote.method,
+        failureReason: remote.failureReason,
+      }),
+    );
+    await this.afterProviderOutcome(outcome, 'checkout');
+
+    const fresh = await this.prisma.payment.findUnique({ where: { id: payment.id } });
+    return this.toCustomerView(fresh || payment);
+  }
+
+  private async applyProviderOutcome(
+    tx: Prisma.TransactionClient,
+    paymentId: string,
+    outcome: {
+      status: 'SUCCESS' | 'FAILED';
+      providerPaymentId?: string;
+      amountMinor?: string;
+      method?: string;
+      failureReason?: string;
+    },
+  ): Promise<{ paymentId: string; status: string; duplicate?: boolean }> {
+    await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+    if (payment.status === 'SUCCESS') {
+      return { paymentId, status: 'SUCCESS', duplicate: true };
+    }
+
+    if (outcome.status === 'FAILED') {
+      if (!OPEN_PAYMENT.includes(payment.status)) {
+        return { paymentId, status: payment.status, duplicate: true };
+      }
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'FAILED',
+          failedAt: new Date(),
+          refusalReason: outcome.failureReason || 'Payment failed',
+          externalId: outcome.providerPaymentId || payment.externalId,
+        },
+      });
+      return { paymentId, status: 'FAILED' };
+    }
+
+    if (!OPEN_PAYMENT.includes(payment.status) && payment.status !== 'FAILED') {
+      return { paymentId, status: payment.status, duplicate: true };
+    }
+
+    const expectedMinor = money(payment.amount).mul(100);
+    if (!outcome.amountMinor || !expectedMinor.eq(outcome.amountMinor)) {
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'DISPUTED',
+          refusalReason: 'Provider amount did not match',
+          externalId: outcome.providerPaymentId || payment.externalId,
+        },
+      });
+      return { paymentId, status: 'DISPUTED' };
+    }
+
+    await this.settleSuccessfulPayment(tx, payment, outcome.providerPaymentId, providerMethod(outcome.method));
+    return { paymentId, status: 'SUCCESS' };
+  }
+
+  private async afterProviderOutcome(
+    result: { paymentId?: string; status?: string; duplicate?: boolean },
+    source: 'webhook' | 'checkout',
+  ) {
+    if (!result.paymentId || result.duplicate) {
+      return;
+    }
+    const payment = await this.prisma.payment.findUnique({ where: { id: result.paymentId } });
+    if (!payment) {
+      return;
+    }
+    const via = source === 'webhook' ? 'provider webhook' : 'checkout confirmation';
+
+    if (result.status === 'SUCCESS' && payment.userId) {
+      await this.notifications.publish({
+        eventType: 'REPAYMENT_SUCCESSFUL',
+        userId: payment.userId,
+        referenceId: payment.id,
+        dedupeKey: `repayment-successful:${payment.id}`,
+        variables: { amount: money(payment.amount).toFixed(2) },
+      });
+      await this.audit.log({
+        actionType: 'PAYMENT',
+        entityType: 'Payment',
+        entityId: payment.id,
+        changedForUserId: payment.userId,
+        message: `Repayment settled from ${via}`,
+        metadata: { amount: String(payment.amount), gateway: payment.gateway, method: payment.method },
+      });
+    }
+
+    if (result.status === 'FAILED') {
+      await this.audit.log({
+        actionType: 'PAYMENT_FAILED',
+        entityType: 'Payment',
+        entityId: payment.id,
+        severity: 'MEDIUM',
+        message: `Provider reported payment failure (${via})`,
+      });
+      if (payment.userId) {
+        await this.notifications.publish({
+          eventType: 'PAYMENT_FAILED',
+          userId: payment.userId,
+          referenceId: payment.id,
+          dedupeKey: `payment-failed:${payment.id}:${payment.externalId || source}`,
+          variables: { amount: money(payment.amount).toFixed(2) },
+        });
+      }
+    }
+
+    if (result.status === 'DISPUTED') {
+      await this.audit.log({
+        actionType: 'PAYMENT_FAILED',
+        entityType: 'Payment',
+        entityId: payment.id,
+        changedForUserId: payment.userId || undefined,
+        severity: 'HIGH',
+        message: `Provider amount did not match the payment (${via})`,
+      });
+    }
   }
 
   async create(data: {
@@ -404,6 +505,7 @@ export class PaymentsService {
       status: string;
     },
     providerPaymentId?: string,
+    method?: string,
   ) {
     if (!payment.scheduleId) {
       throw new BadRequestException('Payment is not linked to an installment');
@@ -433,6 +535,7 @@ export class PaymentsService {
         capturedAt: new Date(),
         settledAt: new Date(),
         externalId: providerPaymentId || undefined,
+        ...(method ? { method: method as never } : {}),
       },
     });
 
@@ -613,6 +716,19 @@ export class PaymentsService {
         : null,
     };
   }
+}
+
+const PROVIDER_METHODS: Record<string, string> = {
+  upi: 'UPI',
+  card: 'CARD',
+  netbanking: 'NET_BANKING',
+  wallet: 'WALLET',
+  emandate: 'AUTODEBIT',
+  nach: 'AUTODEBIT',
+};
+
+function providerMethod(method: string | undefined): string | undefined {
+  return method ? PROVIDER_METHODS[method.toLowerCase()] : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

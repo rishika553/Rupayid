@@ -28,8 +28,25 @@ export type ProviderWebhookEvent = {
   failureReason?: string;
 };
 
+export type CheckoutConfirmation = {
+  orderId: string;
+  providerPaymentId: string;
+  signature: string;
+};
+
+export type ProviderPaymentStatus = {
+  providerPaymentId: string;
+  orderId?: string;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING';
+  amountMinor?: string;
+  method?: string;
+  failureReason?: string;
+};
+
 export interface PaymentProvider {
   readonly name: string;
   createOrder(input: CreateProviderOrderInput): Promise<CreateProviderOrderResult>;
   verifyWebhook(rawBody: Buffer | string, signature: string | undefined): ProviderWebhookEvent;
+  verifyCheckoutSignature(input: CheckoutConfirmation): void;
+  fetchPayment(providerPaymentId: string): Promise<ProviderPaymentStatus>;
 }

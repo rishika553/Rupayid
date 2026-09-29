@@ -5,9 +5,31 @@ import { RazorpayProvider, toPaise } from './razorpay.provider';
 
 describe('RazorpayProvider', () => {
   const secret = 'whsec_test';
-  const provider = new RazorpayProvider({
-    get: (key: string) => (key === 'RAZORPAY_WEBHOOK_SECRET' ? secret : undefined),
-  } as never);
+  const keySecret = 'key_secret_test';
+  const env: Record<string, string> = {
+    RAZORPAY_WEBHOOK_SECRET: secret,
+    RAZORPAY_KEY_ID: 'rzp_test_abc',
+    RAZORPAY_KEY_SECRET: keySecret,
+  };
+  const provider = new RazorpayProvider({ get: (key: string) => env[key] } as never);
+
+  it('accepts a checkout signature made with the key secret', () => {
+    const signature = createHmac('sha256', keySecret).update('order_1|pay_1').digest('hex');
+    expect(() =>
+      provider.verifyCheckoutSignature({ orderId: 'order_1', providerPaymentId: 'pay_1', signature }),
+    ).not.toThrow();
+  });
+
+  it('rejects a checkout signature for a different payment', () => {
+    const signature = createHmac('sha256', keySecret).update('order_1|pay_1').digest('hex');
+    expect(() =>
+      provider.verifyCheckoutSignature({ orderId: 'order_1', providerPaymentId: 'pay_2', signature }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('reports test mode from the key id', () => {
+    expect(provider.isTestMode()).toBe(true);
+  });
 
   it('converts rupees to paise with Decimal', () => {
     expect(toPaise(new Prisma.Decimal('9000.10'))).toBe(900010);

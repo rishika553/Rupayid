@@ -65,8 +65,15 @@ export function useMyTrackedLoans() {
 
 export function useEvaluateEligibility() {
   return useMutation({
-    mutationFn: (loanProductId: string) =>
-      requireApi(apiClient.post<EligibilityResult>('/eligibility/evaluate', { loanProductId })),
+    mutationFn: (
+      input: string | { loanProductId: string; monthlyIncome?: number; employmentType?: string },
+    ) =>
+      requireApi(
+        apiClient.post<EligibilityResult>(
+          '/eligibility/evaluate',
+          typeof input === 'string' ? { loanProductId: input } : input,
+        ),
+      ),
   });
 }
 
@@ -272,6 +279,28 @@ export function useCreateRepaymentPayment() {
     onSuccess: (payment) => {
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.setQueryData(['payments', payment.id], payment);
+    },
+  });
+}
+
+export function useVerifyRepaymentPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      paymentId,
+      ...body
+    }: {
+      paymentId: string;
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    }) => requireApi(apiClient.post<PaymentRecord>(`/payments/${paymentId}/verify`, body)),
+    onSuccess: (payment) => {
+      queryClient.setQueryData(['payments', payment.id], payment);
+      void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      void queryClient.invalidateQueries({ queryKey: ['loans'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 }

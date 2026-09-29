@@ -8,6 +8,7 @@ import type { CurrentUserPayload } from '../../common/decorators/current-user.de
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CreateCustomerPaymentDto } from './dto/create-payment.dto';
+import { VerifyCustomerPaymentDto } from './dto/verify-payment.dto';
 import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
@@ -27,6 +28,20 @@ export class PaymentsController {
       loanId: data.loanId,
       installmentNumber: data.installmentNumber,
       idempotencyKey: idempotencyKey || data.idempotencyKey,
+    });
+  }
+
+  @Post(':id/verify')
+  @ApiOperation({ summary: 'Confirm a checkout payment using the provider signature' })
+  async verifyCustomerPayment(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() data: VerifyCustomerPaymentDto,
+  ) {
+    return this.paymentsService.verifyCustomerPayment(user.id, id, {
+      orderId: data.razorpayOrderId,
+      providerPaymentId: data.razorpayPaymentId,
+      signature: data.razorpaySignature,
     });
   }
 

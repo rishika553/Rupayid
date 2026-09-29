@@ -11,6 +11,11 @@ import {
   type EligibilityFacts,
 } from './eligibility.engine';
 
+export type DeclaredApplicantFacts = {
+  monthlyIncome?: number | null;
+  employmentType?: string | null;
+};
+
 export type CustomerEligibilityResult = {
   reference: string;
   eligible: boolean;
@@ -61,13 +66,17 @@ export class EligibilityService {
     });
   }
 
-  async evaluate(userId: string, loanProductId: string): Promise<CustomerEligibilityResult> {
+  async evaluate(
+    userId: string,
+    loanProductId: string,
+    declared?: DeclaredApplicantFacts,
+  ): Promise<CustomerEligibilityResult> {
     const product = await this.prisma.loanProduct.findUnique({ where: { id: loanProductId } });
     if (!product || !this.loanProducts.isOfferedToCustomers(product)) {
       throw new NotFoundException('Loan product not found');
     }
     const offered = this.loanProducts.toCustomerProduct(product);
-    const facts = await this.loadFacts(userId);
+    const facts = await this.loadFacts(userId, declared);
     const rules = await this.prisma.eligibilityRule.findMany({
       where: { status: 'ACTIVE' },
       include: {
@@ -234,7 +243,7 @@ export class EligibilityService {
       });
   }
 
-  private async loadFacts(userId: string): Promise<EligibilityFacts> {
+  private async loadFacts(userId: string, declared?: DeclaredApplicantFacts): Promise<EligibilityFacts> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -253,13 +262,18 @@ export class EligibilityService {
     const details = user.kycApplications[0]?.details;
     const dob = details?.dateOfBirth || profile?.dateOfBirth || null;
     const yearly = profile?.yearlyIncome != null ? Number(profile.yearlyIncome) : null;
+    const profileMonthly = yearly != null && Number.isFinite(yearly) ? yearly / 12 : null;
+    const declaredMonthly =
+      declared?.monthlyIncome != null && Number.isFinite(Number(declared.monthlyIncome)) && Number(declared.monthlyIncome) > 0
+        ? Number(declared.monthlyIncome)
+        : null;
     return {
       ageYears: dob ? ageInYears(dob) : null,
-      monthlyIncome: yearly != null && Number.isFinite(yearly) ? yearly / 12 : null,
+      monthlyIncome: declaredMonthly ?? profileMonthly,
       creditScore: profile?.creditScore ?? null,
       city: details?.city || profile?.city || null,
       pincode: details?.pincode || profile?.pincode || null,
-      occupation: profile?.occupation || null,
+      occupation: declared?.employmentType?.trim() || profile?.occupation || null,
     };
   }
 }

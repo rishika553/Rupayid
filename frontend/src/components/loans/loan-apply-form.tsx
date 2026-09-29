@@ -102,29 +102,41 @@ export function LoanApplyForm() {
     );
   }, [products, watchedAmount]);
 
+  const watchedIncome = Number(form.watch('monthlyIncome')) || undefined;
+  const watchedEmployment = form.watch('employmentType') || undefined;
+
   useEffect(() => {
     if (!selectedProduct) {
       return;
     }
     let cancelled = false;
-    void evaluateEligibility.mutateAsync(selectedProduct.id).then(
-      (result) => {
-        if (!cancelled) {
-          setEligibility(result);
-          setEligibilityError(null);
-        }
-      },
-      (error: unknown) => {
-        if (!cancelled) {
-          setEligibility(null);
-          setEligibilityError(error instanceof Error ? error.message : 'Could not check eligibility');
-        }
-      },
-    );
+    const timer = window.setTimeout(() => {
+      void evaluateEligibility
+        .mutateAsync({
+          loanProductId: selectedProduct.id,
+          monthlyIncome: watchedIncome,
+          employmentType: watchedEmployment,
+        })
+        .then(
+          (result) => {
+            if (!cancelled) {
+              setEligibility(result);
+              setEligibilityError(null);
+            }
+          },
+          (error: unknown) => {
+            if (!cancelled) {
+              setEligibility(null);
+              setEligibilityError(error instanceof Error ? error.message : 'Could not check eligibility');
+            }
+          },
+        );
+    }, 500);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [selectedProduct?.id]);
+  }, [selectedProduct?.id, watchedIncome, watchedEmployment]);
 
   async function onSubmit(values: FormValues) {
     if (!products.length || !limits) {

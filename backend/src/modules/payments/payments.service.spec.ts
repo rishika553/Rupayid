@@ -143,6 +143,14 @@ function harness() {
       currency: 'INR',
     })),
     verifyWebhook: jest.fn((body: string) => JSON.parse(body)),
+    verifyCheckoutSignature: jest.fn(),
+    fetchPayment: jest.fn(async () => ({
+      providerPaymentId: 'rzp_pay_1',
+      orderId: 'order_1',
+      status: 'SUCCESS',
+      amountMinor: '900000',
+      method: 'card',
+    })),
   };
   const audit = { log: jest.fn() };
   const notifications = { publish: jest.fn() };
@@ -207,5 +215,91 @@ describe('PaymentsService', () => {
     const second = await svc.handleProviderWebhook('{}', 'sig');
     expect(second).toMatchObject({ duplicate: true });
     expect(repayments).toHaveLength(1);
+  });
+
+  describe('verifyCustomerPayment', () => {
+    const confirmation = { orderId: 'order_1', providerPaymentId: 'rzp_pay_1', signature: 'sig' };
+
+    it('settles a signed, captured checkout payment and records the method', async () => {
+      const { svc, payments, repayments } = harness();
+      payments.push(payment());
+      const result = await svc.verifyCustomerPayment('user-1', 'pay-1', confirmation);
+      expect(result.status).toBe('SUCCESS');
+      expect(payments[0].method).toBe('CARD');
+      expect(repayments).toHaveLength(1);
+    });
+
+    it('rejects a tampered signature without touching the payment', async () => {
+      const { svc, payments, provider, repayments } = harness();
+      payments.push(payment());
+      provider.verifyCheckoutSignature.mockImplementation(() => {
+        throw new BadRequestException('Invalid payment signature');
+      });
+      await expect(svc.verifyCustomerPayment('user-1', 'pay-1', confirmation)).rejects.toBeInstanceOf(BadRequestException);
+      expect(provider.fetchPayment).not.toHaveBeenCalled();
+      expect(payments[0].status).toBe('PENDING');
+      expect(repayments).toHaveLength(0);
+    });
+
+    it('hides another customer payment', async () => {
+      const { svc, payments } = harness();
+      payments.push(payment());
+      await expect(svc.verifyCustomerPayment('intruder', 'pay-1', confirmation)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects a confirmation for a different order', async () => {
+      const { svc, payments } = harness();
+      payments.push(payment());
+      await expect(
+        svc.verifyCustomerPayment('user-1', 'pay-1', { ...confirmation, orderId: 'order_other' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('leaves the payment pending while the provider has not captured it', async () => {
+      const { svc, payments, provider, repayments } = harness();
+      payments.push(payment());
+      provider.fetchPayment.mockResolvedValueOnce({
+        providerPaymentId: 'rzp_pay_1',
+        orderId: 'order_1',
+        status: 'PENDING',
+        amountMinor: '900000',
+        method: 'upi',
+      });
+      const result = await svc.verifyCustomerPayment('user-1', 'pay-1', confirmation);
+      expect(result.status).toBe('PENDING');
+      expect(repayments).toHaveLength(0);
+    });
+
+    it('marks the payment disputed when the captured amount differs', async () => {
+      const { svc, payments, provider, repayments } = harness();
+      payments.push(payment());
+      provider.fetchPayment.mockResolvedValueOnce({
+        providerPaymentId: 'rzp_pay_1',
+        orderId: 'order_1',
+        status: 'SUCCESS',
+        amountMinor: '100',
+        method: 'upi',
+      });
+      const result = await svc.verifyCustomerPayment('user-1', 'pay-1', confirmation);
+      expect(result.status).toBe('DISPUTED');
+      expect(repayments).toHaveLength(0);
+    });
+
+    it('does not settle twice when the webhook arrives after checkout confirmation', async () => {
+      const { svc, payments, provider, repayments } = harness();
+      payments.push(payment());
+      await svc.verifyCustomerPayment('user-1', 'pay-1', confirmation);
+      provider.verifyWebhook.mockImplementation(() => ({
+        eventId: 'evt_late',
+        eventType: 'payment.captured',
+        orderId: 'order_1',
+        providerPaymentId: 'rzp_pay_1',
+        status: 'SUCCESS',
+        amountMinor: '900000',
+      }));
+      const webhook = await svc.handleProviderWebhook('{}', 'sig');
+      expect(webhook).toMatchObject({ duplicate: true });
+      expect(repayments).toHaveLength(1);
+    });
   });
 });
