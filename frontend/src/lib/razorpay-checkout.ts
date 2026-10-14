@@ -74,23 +74,26 @@ export async function openRazorpayCheckout(options: CheckoutOptions): Promise<Ch
   });
 }
 
+let scriptPromise: Promise<void> | null = null;
+
 function loadScript(): Promise<void> {
   if (window.Razorpay) {
     return Promise.resolve();
   }
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-razorpay="checkout"]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Unable to load payment checkout')));
-      return;
-    }
+  if (scriptPromise) {
+    return scriptPromise;
+  }
+  scriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.dataset.razorpay = 'checkout';
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Unable to load payment checkout'));
+    script.onerror = () => {
+      scriptPromise = null;
+      reject(new Error('Unable to load payment checkout'));
+    };
     document.body.appendChild(script);
   });
+  return scriptPromise;
 }

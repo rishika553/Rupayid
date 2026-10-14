@@ -66,7 +66,7 @@ const schema = z.object({
   aadhaarLastFour: z.string().regex(/^\d{4}$|^$/, 'Enter the last 4 of Aadhaar'),
   idDocumentType: optionalText(40),
   accountHolderName: optionalText(120),
-  accountLastFour: z.string().regex(/^\d{4}$|^$/, 'Enter the last 4 of the account'),
+  accountLastFour: z.string().regex(/^\d{9,18}$|^$/, 'Enter a valid account number (9–18 digits)'),
   ifsc: z.string().regex(/^[A-Za-z]{4}0[A-Za-z0-9]{6}$|^$/, 'Enter a valid IFSC'),
   accountType: optionalText(32),
   bankName: optionalText(80),
@@ -347,8 +347,8 @@ export default function ProfilePage() {
             <KycField label="Account holder" htmlFor="accountHolderName">
               <Input id="accountHolderName" disabled={locked} {...form.register('accountHolderName')} />
             </KycField>
-            <KycField label="Account last 4" htmlFor="accountLastFour" error={form.formState.errors.accountLastFour?.message}>
-              <Input id="accountLastFour" inputMode="numeric" maxLength={4} disabled={locked} {...form.register('accountLastFour')} />
+            <KycField label="Account number" htmlFor="accountLastFour" error={form.formState.errors.accountLastFour?.message}>
+              <Input id="accountLastFour" inputMode="numeric" maxLength={18} disabled={locked} {...form.register('accountLastFour')} />
             </KycField>
             <KycField label="IFSC" htmlFor="ifsc" error={form.formState.errors.ifsc?.message}>
               <Input id="ifsc" disabled={locked} {...form.register('ifsc')} />
@@ -395,7 +395,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <div className="sticky bottom-20 z-10 rounded-lg border bg-card p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0 lg:bottom-auto">
+        <div className="sticky bottom-4 z-10 rounded-lg border bg-card p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <Button type="submit" disabled={update.isPending || form.formState.isSubmitting}>
             {update.isPending ? 'Saving…' : 'Save profile'}
           </Button>

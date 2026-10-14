@@ -476,7 +476,7 @@ async function main() {
             aadhaarLastFour: '6789',
             idDocumentType: 'AADHAAR_CARD',
             accountHolderName: 'Aisha Khan',
-            accountLastFour: '4321',
+            accountLastFour: '123456784321',
             ifsc: 'HDFC0001234',
             bankName: 'HDFC Bank',
             accountType: 'SAVINGS',

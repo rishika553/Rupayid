@@ -314,7 +314,7 @@ function KycDetailsBlock({ details }: { details: AdminKycDetails | null }) {
     { label: 'PAN last four', value: details.panLastFour },
     { label: 'Aadhaar last four', value: details.aadhaarLastFour },
     { label: 'Account holder', value: details.accountHolderName },
-    { label: 'Account last four', value: details.accountLastFour },
+    { label: 'Account number', value: details.accountLastFour },
     { label: 'IFSC', value: details.ifsc },
     { label: 'Bank name', value: details.bankName },
     { label: 'Account type', value: details.accountType },

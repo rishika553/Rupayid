@@ -44,7 +44,7 @@ export default function AdminKycQueuePage() {
         }}
       >
         <select
-          className="h-10 rounded-xl border bg-card px-3 text-sm"
+          className="h-10 w-full rounded-xl border bg-card px-3 text-sm sm:w-auto sm:min-w-[140px]"
           value={status}
           onChange={(event) => setStatus(event.target.value)}
         >

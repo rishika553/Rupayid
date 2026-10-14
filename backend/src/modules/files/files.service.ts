@@ -50,6 +50,10 @@ export class FilesService {
           accessKeyId: this.configService.get<string>('R2_ACCESS_KEY_ID') as string,
           secretAccessKey: this.configService.get<string>('R2_SECRET_ACCESS_KEY') as string,
         },
+        // Disable SDK-injected checksum headers — R2 doesn't require them and they
+        // complicate CORS preflight (browser would need to send x-amz-checksum-* headers).
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
       });
     }
   }

@@ -102,10 +102,10 @@ export class UpsertKycDetailsDto {
   @MaxLength(120)
   accountHolderName?: string;
 
-  @ApiPropertyOptional({ description: 'Last 4 of account only' })
+  @ApiPropertyOptional({ description: 'Full bank account number' })
   @IsOptional()
   @IsString()
-  @Length(4, 4)
+  @Matches(/^\d{9,18}$/, { message: 'Enter a valid account number (9–18 digits)' })
   accountLastFour?: string;
 
   @ApiPropertyOptional()

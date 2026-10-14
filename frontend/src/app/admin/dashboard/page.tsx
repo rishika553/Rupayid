@@ -111,7 +111,7 @@ function DashboardBody({
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <StatCard
           icon={ShieldCheck}
           label="KYC pending"

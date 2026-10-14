@@ -52,16 +52,23 @@
   --radius: 0.9rem;
   --cta: 25 70% 58%;
   --cta-foreground: 20 40% 16%;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-inter), Inter, sans-serif;
+}
+
+html,
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 .portal-card {
   border-radius: 1rem;
   border: 1px solid hsl(var(--border) / 0.9);
   background: hsl(var(--card));
+  overflow: hidden;
   box-shadow:
     0 1px 2px rgb(16 24 40 / 0.04),
     0 12px 32px -24px rgb(15 76 129 / 0.35);
@@ -160,9 +167,16 @@
 .lending-visual,
 .contact-visual {
   background: linear-gradient(145deg, oklch(0.34 0.09 240), oklch(0.27 0.11 210));
-  min-height: 390px;
+  min-height: 260px;
   position: relative;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .lending-visual,
+  .contact-visual {
+    min-height: 390px;
+  }
 }
 
 .lending-visual::after,

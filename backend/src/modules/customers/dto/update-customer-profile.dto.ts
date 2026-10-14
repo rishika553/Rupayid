@@ -165,8 +165,7 @@ export class UpdateCustomerProfileDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(trimToUndefined)
-  @Length(4, 4)
-  @Matches(/^\d{4}$/)
+  @Matches(/^\d{9,18}$/, { message: 'Enter a valid account number (9–18 digits)' })
   accountLastFour?: string;
 
   @ApiPropertyOptional()

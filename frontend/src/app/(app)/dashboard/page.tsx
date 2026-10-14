@@ -75,7 +75,7 @@ export default function DashboardPage() {
 
       <SummaryCards dashboard={dashboard} />
 
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
         <ApplicationTracker
           application={trackedApplication}
           isLoading={!dashboard.loan.currentApplication && loans.isLoading}
@@ -88,7 +88,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
         <RepaymentOverview
           hasActiveLoan={hasActiveLoan}
           schedule={schedule.data}
@@ -98,7 +98,7 @@ export default function DashboardPage() {
         <ReferralCard referral={dashboard.referral} />
       </div>
 
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
         <RecentPayments payments={dashboard.payments.recent} hasActiveLoan={hasActiveLoan} />
       </div>
     </div>
@@ -109,7 +109,7 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
       <Skeleton className="h-44 rounded-[1.25rem]" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-[196px] rounded-[1.25rem]" />
         ))}

@@ -86,8 +86,8 @@ export const kycBankSchema = z
     if (value.accountHolderName.trim().length < 2) {
       ctx.addIssue({ code: 'custom', path: ['accountHolderName'], message: 'Enter the account holder name' });
     }
-    if (!/^\d{4}$/.test(value.accountLastFour)) {
-      ctx.addIssue({ code: 'custom', path: ['accountLastFour'], message: 'Enter the last 4 digits of the account' });
+    if (!/^\d{9,18}$/.test(value.accountLastFour)) {
+      ctx.addIssue({ code: 'custom', path: ['accountLastFour'], message: 'Enter a valid account number (9–18 digits)' });
     }
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(value.ifsc)) {
       ctx.addIssue({ code: 'custom', path: ['ifsc'], message: 'Enter a valid IFSC' });

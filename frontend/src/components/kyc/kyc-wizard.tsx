@@ -92,7 +92,7 @@ export function KycWizard({
       [
         'Bank',
         values.includeBank
-          ? `${values.accountHolderName}, ${values.bankName}, ****${values.accountLastFour}, ${values.ifsc}`
+          ? `${values.accountHolderName}, ${values.bankName}, ${values.accountLastFour}, ${values.ifsc}`
           : 'Not provided',
       ],
       ['Documents', String(documents.length)],
@@ -407,12 +407,11 @@ export function KycWizard({
                       <Input id="accountHolderName" {...form.register('accountHolderName')} />
                     </KycField>
                     <KycField
-                      label="Account last 4"
+                      label="Account number"
                       htmlFor="accountLastFour"
-                      hint="Full account numbers are never stored."
                       error={form.formState.errors.accountLastFour?.message}
                     >
-                      <Input id="accountLastFour" inputMode="numeric" maxLength={4} {...form.register('accountLastFour')} />
+                      <Input id="accountLastFour" inputMode="numeric" maxLength={18} {...form.register('accountLastFour')} />
                     </KycField>
                     <KycField label="IFSC" htmlFor="ifsc" error={form.formState.errors.ifsc?.message}>
                       <Input id="ifsc" className="uppercase" {...form.register('ifsc')} />
