@@ -164,6 +164,365 @@ body {
   background: linear-gradient(135deg, oklch(0.87 0.08 170), oklch(0.96 0.05 75));
 }
 
+/* ─── New Hero: Phone Mockup ─── */
+
+.hero-phone-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  min-height: 520px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-phone-gradient {
+  position: absolute;
+  inset: -5% -8% -5% -2%;
+  border-radius: 50% 40% 45% 50%;
+  background:
+    radial-gradient(ellipse at 35% 25%, #c5f0e0 0%, transparent 50%),
+    radial-gradient(ellipse at 72% 65%, #c5e3ff 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 45%, #d9f8ec 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 70%, #e0f7ed 0%, transparent 45%);
+  filter: blur(35px);
+  z-index: 0;
+  opacity: 0.9;
+}
+
+.hero-phone {
+  position: relative;
+  z-index: 2;
+  width: 260px;
+  background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 40%, #111 100%);
+  border-radius: 36px;
+  padding: 8px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.1),
+    0 0 0 2px rgba(0,0,0,0.3),
+    0 30px 70px -15px rgba(0,0,0,0.45),
+    0 10px 25px -8px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
+  transition: transform 0.1s ease-out;
+}
+
+.hero-phone-reflection {
+  position: absolute;
+  inset: 0;
+  border-radius: 36px;
+  z-index: 15;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.04) 25%,
+    transparent 45%,
+    transparent 60%,
+    rgba(255,255,255,0.03) 80%,
+    rgba(255,255,255,0.08) 100%
+  );
+}
+
+/* Side buttons */
+.hero-phone-btn-right {
+  position: absolute;
+  right: -2.5px;
+  width: 3px;
+  background: linear-gradient(180deg, #3a3a3a, #222);
+  border-radius: 0 2px 2px 0;
+  z-index: 3;
+}
+.hero-phone-btn-left {
+  position: absolute;
+  left: -2.5px;
+  width: 3px;
+  background: linear-gradient(180deg, #3a3a3a, #222);
+  border-radius: 2px 0 0 2px;
+  z-index: 3;
+}
+.hero-phone-btn-power {
+  top: 110px;
+  height: 38px;
+}
+.hero-phone-btn-silent {
+  top: 80px;
+  height: 16px;
+}
+.hero-phone-btn-vol-up {
+  top: 110px;
+  height: 30px;
+}
+.hero-phone-btn-vol-down {
+  top: 148px;
+  height: 30px;
+}
+
+.hero-phone-notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 24px;
+  background: #111;
+  border-radius: 0 0 18px 18px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hero-phone-camera {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #3a3a5a, #1a1a2e);
+  box-shadow:
+    inset 0 0 2px rgba(100,100,200,0.3),
+    0 0 1px rgba(255,255,255,0.1);
+}
+
+.hero-phone-screen {
+  position: relative;
+  background: #ffffff;
+  border-radius: 28px;
+  overflow: hidden;
+  min-height: 480px;
+  font-family: var(--font-inter), Inter, sans-serif;
+}
+
+/* Skeleton shimmer */
+.hero-phone-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #fff;
+  padding: 16px;
+  pointer-events: none;
+}
+.hero-skeleton-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.hero-skeleton-block {
+  height: 80px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── Floating Feature Cards ─── */
+
+/* Dot pattern behind the phone */
+.hero-dot-pattern {
+  position: absolute;
+  right: -5%;
+  top: 10%;
+  width: 180px;
+  height: 280px;
+  z-index: 0;
+  opacity: 0.25;
+  background-image: radial-gradient(circle, #a8d8ea 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+.hero-float-card {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 12px 16px;
+  box-shadow: 0 12px 32px -12px rgba(15,76,129,0.2), 0 2px 6px rgba(0,0,0,0.04);
+  white-space: nowrap;
+  max-width: 260px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hero-float-card-1 {
+  left: -10%;
+  top: 8%;
+}
+.hero-float-card-2 {
+  left: -14%;
+  top: 38%;
+}
+.hero-float-card-3 {
+  left: -8%;
+  top: 68%;
+}
+.hero-float-card-4 {
+  right: -8%;
+  top: 25%;
+}
+.hero-float-card-5 {
+  right: -10%;
+  top: 58%;
+}
+
+/* ─── Decorative SVGs ─── */
+
+.hero-decor-strokes {
+  position: absolute;
+  top: 2%;
+  right: 8%;
+  z-index: 1;
+  opacity: 0.7;
+}
+
+.hero-decor-arrow {
+  position: absolute;
+  bottom: 12%;
+  left: 8%;
+  z-index: 1;
+  opacity: 0.6;
+}
+
+/* ─── Green underline accent ─── */
+
+.hero-green-underline {
+  position: relative;
+  display: inline;
+}
+.hero-green-underline::after {
+  content: '';
+  position: absolute;
+  left: -2%;
+  right: 5%;
+  bottom: 4px;
+  height: 12px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 14'%3E%3Cpath d='M2 9 C40 4,80 12,120 7 C160 2,200 11,240 6 C260 3,280 8,298 5' stroke='%2380dfc4' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+  z-index: -1;
+  opacity: 0.65;
+}
+
+/* ─── Responsive adjustments ─── */
+
+@media (max-width: 1024px) {
+  .hero-phone-wrapper {
+    max-width: 480px;
+    min-height: 440px;
+    margin: 0 auto;
+  }
+  .hero-phone {
+    width: 220px;
+    transform: none;
+  }
+  .hero-phone-screen {
+    min-height: 400px;
+  }
+  .hero-float-card {
+    padding: 8px 12px;
+    border-radius: 14px;
+    max-width: 220px;
+    font-size: 12px;
+  }
+  .hero-float-card-1 { left: -2%; top: 5%; }
+  .hero-float-card-2 { left: -5%; top: 35%; }
+  .hero-float-card-3 { left: 0; top: 65%; }
+  .hero-float-card-4 { right: -2%; top: 22%; }
+  .hero-float-card-5 { right: -3%; top: 55%; }
+}
+
+@media (max-width: 640px) {
+  .hero-phone-wrapper {
+    max-width: 360px;
+    min-height: 400px;
+  }
+  .hero-phone {
+    width: 200px;
+  }
+  .hero-phone-screen {
+    min-height: 360px;
+  }
+  .hero-float-card {
+    display: none;
+  }
+  .hero-decor-strokes,
+  .hero-decor-arrow,
+  .hero-dot-pattern {
+    display: none;
+  }
+  .hero-green-underline::after {
+    height: 8px;
+    bottom: 2px;
+  }
+  .hero-phone-btn-right,
+  .hero-phone-btn-left {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-phone {
+    transform: perspective(1200px) rotateY(-4deg) rotateX(2deg) !important;
+  }
+  .hero-phone-skeleton {
+    display: none;
+  }
+  .hero-float-card {
+    animation: none !important;
+  }
+  .hero-skeleton-bar,
+  .hero-skeleton-block {
+    animation: none;
+  }
+}
+
+/* ─── Themed Section Backgrounds ─── */
+
+.section-bg-white {
+  background: #ffffff;
+  border-top: 1px solid hsl(210 15% 92%);
+  border-bottom: 1px solid hsl(210 15% 92%);
+}
+
+.section-bg-warm {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(217, 248, 236, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(254, 235, 220, 0.25) 0%, transparent 50%),
+    linear-gradient(180deg, #faf8f5 0%, #fdf9f6 100%);
+}
+
+.section-bg-mint {
+  background:
+    radial-gradient(ellipse at 75% 20%, rgba(200, 240, 225, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 15% 80%, rgba(200, 225, 255, 0.2) 0%, transparent 50%),
+    linear-gradient(180deg, #eef7f3 0%, #f0f8f4 100%);
+}
+
+.section-bg-blue {
+  background:
+    radial-gradient(ellipse at 30% 10%, rgba(200, 225, 255, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 90%, rgba(217, 248, 236, 0.25) 0%, transparent 50%),
+    linear-gradient(180deg, #edf3fa 0%, #f0f5fb 100%);
+}
+
+.section-bg-navy {
+  background: linear-gradient(160deg, #082E61 0%, #0a4280 40%, #07396B 100%);
+}
+
+.section-bg-gradient {
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(217, 248, 236, 0.15) 0%, transparent 60%),
+    linear-gradient(180deg, #f5f8fc 0%, #faf8f5 100%);
+}
+
 .lending-visual,
 .contact-visual {
   background: linear-gradient(145deg, oklch(0.34 0.09 240), oklch(0.27 0.11 210));
