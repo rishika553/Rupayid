@@ -120,6 +120,7 @@ function harness(seed: { apps?: Array<Record<string, unknown>>; kycStatus?: stri
 }
 
 describe('LoansService customer flow', () => {
+  afterEach(() => jest.useRealTimers());
   it('creates a draft with a server-side cost breakdown', async () => {
     const { svc, apps, audit } = harness();
     const result = await svc.createApplication('user-1', {
@@ -202,7 +203,12 @@ describe('LoansService customer flow', () => {
     expect(second.status).toBe('SUBMITTED');
   });
 
-  it('returns only the owner loan with a customer-safe tracking payload', async () => {
+  it.each([
+    ['2026-09-30T12:00:00Z', 'UPCOMING'],
+    ['2026-10-01T12:00:00Z', 'DUE'],
+    ['2026-10-02T12:00:00Z', 'OVERDUE'],
+  ])('returns an owner-only tracking payload as of %s with status %s', async (asOf, expectedStatus) => {
+    jest.useFakeTimers().setSystemTime(new Date(asOf));
     const due = new Date('2026-10-01');
     const { svc } = harness({
       apps: [
@@ -256,14 +262,14 @@ describe('LoansService customer flow', () => {
     expect(loan.tenureMonths).toBe(10);
     expect(loan.outstandingAmount).toBe('9000.00');
     expect(loan.nextRepayment?.amount).toBe('9000.00');
-    expect(loan.nextRepayment?.status).toBe('UPCOMING');
+    expect(loan.nextRepayment?.status).toBe(expectedStatus);
     expect(loan.schedule?.[0]).toMatchObject({
       installmentNumber: 1,
       principal: '8000.00',
       interest: '1000.00',
       fees: '0.00',
       outstanding: '9000.00',
-      status: 'UPCOMING',
+      status: expectedStatus,
     });
     expect(loan.disbursementDate).toBeTruthy();
     expect(JSON.stringify(loan)).not.toMatch(/internal note|internalScore|secret|note/);

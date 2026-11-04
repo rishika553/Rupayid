@@ -1,0 +1,247 @@
+import type { ApiResponse, AuthTokens } from '@rupayaid/types';
+
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+
+const DEBUG_API = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_API === '1';
+if (DEBUG_API) {
+  console.log('[API] BASE_URL =', API_BASE_URL);
+}
+
+const SKIP_BEARER = new Set([
+  '/auth/refresh',
+  '/auth/login',
+  '/auth/register',
+  '/auth/google',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/health/contact',
+]);
+
+function errorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') {
+    return 'An error occurred';
+  }
+  const data = payload as { message?: unknown; error?: unknown };
+  if (Array.isArray(data.message)) {
+    return data.message.map(String).join(', ');
+  }
+  if (typeof data.message === 'string' && data.message) {
+    return data.message;
+  }
+  if (typeof data.error === 'string' && data.error) {
+    return data.error;
+  }
+  return 'An error occurred';
+}
+
+interface RequestOptions extends Omit<RequestInit, 'method' | 'body'> {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  params?: Record<string, string>;
+  body?: unknown;
+  skipAuthRefresh?: boolean;
+}
+
+type ApiResult<T> = ApiResponse<T> & { status?: number };
+type RefreshResult = 'refreshed' | 'invalid' | 'unavailable';
+
+export class ApiClient {
+  private baseUrl: string;
+  private tokens: AuthTokens | null = null;
+  private refreshInFlight: Promise<RefreshResult> | null = null;
+  private active = true;
+  private requests = new Set<AbortController>();
+
+  constructor(baseUrl: string, private readonly session?: {
+    persist: (tokens: AuthTokens) => Promise<void>;
+    unauthorized: () => void;
+  }) {
+    this.baseUrl = baseUrl;
+  }
+
+  setTokens(tokens: AuthTokens | null) {
+    if (!this.active) return;
+    this.tokens = tokens;
+  }
+
+  dispose() {
+    this.active = false;
+    this.tokens = null;
+    for (const controller of this.requests) controller.abort();
+    this.requests.clear();
+  }
+
+  // Revoke with a separate client so local logout does not wait for the network.
+  revokeSession(): Promise<ApiResponse<unknown>> {
+    const client = new ApiClient(this.baseUrl);
+    client.setTokens(this.tokens);
+    return client.request('/auth/logout', { method: 'POST' })
+      .finally(() => client.dispose());
+  }
+
+  private shouldSendBearer(endpoint: string) {
+    return !SKIP_BEARER.has(endpoint);
+  }
+
+  private async refreshSession(): Promise<RefreshResult> {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+    this.refreshInFlight = (async (): Promise<RefreshResult> => {
+      const current = this.tokens;
+      if (!current?.refreshToken) {
+        return 'invalid';
+      }
+      const response = await this.request<{
+        accessToken: string;
+        refreshToken: string;
+      }>('/auth/refresh', {
+        method: 'POST',
+        body: { refreshToken: current.refreshToken },
+        skipAuthRefresh: true,
+      });
+      if (response.status === 401 || response.status === 403) return 'invalid';
+      if (!response.success) return 'unavailable';
+      if (
+        !response.data?.accessToken ||
+        !response.data?.refreshToken
+      ) {
+        return 'unavailable';
+      }
+      const next: AuthTokens = {
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+      };
+      if (!this.active) return 'invalid';
+      await this.session?.persist(next);
+      if (!this.active) return 'invalid';
+      this.setTokens(next);
+      return 'refreshed';
+    })().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestOptions = {},
+  ): Promise<ApiResult<T>> {
+    if (!this.active) return { success: false, error: 'Session ended' };
+    const {
+      method = 'GET',
+      params,
+      body,
+      headers: customHeaders,
+      skipAuthRefresh,
+      ...rest
+    } = options;
+
+    let url = `${this.baseUrl}${endpoint}`;
+    if (params) {
+      url += `?${new URLSearchParams(params).toString()}`;
+    }
+    if (DEBUG_API) {
+      console.log('[API]', method, url);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(customHeaders as Record<string, string>),
+    };
+
+    const tokens = this.tokens;
+    if (tokens?.accessToken && this.shouldSendBearer(endpoint)) {
+      headers.Authorization = `Bearer ${tokens.accessToken}`;
+    }
+
+    const controller = new AbortController();
+    this.requests.add(controller);
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+        ...rest,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!this.active) return { success: false, error: 'Session ended' };
+
+      if (
+        response.status === 401 &&
+        this.shouldSendBearer(endpoint)
+      ) {
+        const refreshed = skipAuthRefresh ? 'invalid'
+          : tokens?.accessToken !== this.tokens?.accessToken ? 'refreshed'
+          : await this.refreshSession().catch((): RefreshResult => 'invalid');
+        if (!this.active) return { success: false, error: 'Session ended' };
+        if (refreshed === 'refreshed') {
+          return this.request<T>(endpoint, {
+            ...options,
+            skipAuthRefresh: true,
+          });
+        }
+        if (refreshed === 'unavailable') {
+          return { success: false, error: 'Unable to reconnect to your session. Please try again.', status: 503 };
+        }
+        this.dispose();
+        this.session?.unauthorized();
+      }
+
+      if (!response.ok) {
+        return { success: false, error: errorMessage(payload), status: response.status };
+      }
+
+      return {
+        success: true,
+        data: (payload as { data?: T }).data ?? payload,
+      };
+    } catch (error) {
+      if (DEBUG_API) {
+        console.log('[API] FETCH ERROR', url, error instanceof Error ? error.message : error);
+      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error',
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      this.requests.delete(controller);
+    }
+  }
+
+  async get<T>(endpoint: string, params?: Record<string, string>) {
+    return this.request<T>(endpoint, { method: 'GET', params });
+  }
+
+  async post<T>(endpoint: string, body?: unknown) {
+    return this.request<T>(endpoint, { method: 'POST', body });
+  }
+
+  async patch<T>(endpoint: string, body?: unknown) {
+    return this.request<T>(endpoint, { method: 'PATCH', body });
+  }
+
+  async put<T>(endpoint: string, body?: unknown) {
+    return this.request<T>(endpoint, { method: 'PUT', body });
+  }
+
+  async delete<T>(endpoint: string) {
+    return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+}
+
+// Public password-reset endpoints only. Protected callers use useAuth().client.
+export const apiClient = new ApiClient(API_BASE_URL);
+
+export async function requireApi<T>(
+  promise: Promise<ApiResponse<T>>,
+): Promise<T> {
+  const response = await promise;
+  if (!response.success || response.data === undefined) {
+    throw new Error(response.error || 'Request failed');
+  }
+  return response.data;
+}

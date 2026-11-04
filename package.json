@@ -12,6 +12,8 @@
     "dev": "pnpm --filter @rupayaid/web dev & pnpm --filter @rupayaid/api start:dev",
     "dev:web": "pnpm --filter @rupayaid/web dev",
     "dev:api": "pnpm --filter @rupayaid/api start:dev",
+    "dev:mobile": "pnpm --filter @rupayaid/mobile start",
+    "mobile:android": "pnpm --filter @rupayaid/mobile start:android",
     "build": "pnpm --filter @rupayaid/web build && pnpm --filter @rupayaid/api build",
     "build:web": "pnpm --filter @rupayaid/web build",
     "build:api": "pnpm --filter @rupayaid/api build",

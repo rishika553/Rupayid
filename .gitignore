@@ -9,12 +9,12 @@ build/
 out/
 *.tsbuildinfo
 
-# Environment variables
+# Environment variables (NEVER commit — .env.example is the only exception)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 
 # IDE
 .vscode/*
@@ -51,3 +51,42 @@ prisma/migrations/
 *.pem
 *.key
 *.cert
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.p8
+google-services.json
+GoogleService-Info.plist
+firebase-adminsdk*.json
+service-account*.json
+secrets/
+credentials/
+
+# Mobile / Expo / React Native
+.expo/
+.expo-shared/
+mobile/android/
+mobile/ios/
+mobile/web-build/
+mobile/emulator-boot*.log
+*.apk
+*.aab
+*.ipa
+
+# Logs
+*.log
+logs/
+
+# Caches & temp
+.cache/
+.parcel-cache/
+tmp/
+temp/
+*.tmp
+
+# Editor extras
+.vscode/*.local
+.history/
