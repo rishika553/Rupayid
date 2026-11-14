@@ -15,8 +15,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
-import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, rm, stat, writeFile } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { mkdir, open, rm, stat, writeFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -300,9 +300,12 @@ export class FilesService {
       },
     });
     let created = false;
-    const output = createWriteStream(path, { flags: 'wx' });
-    output.once('open', () => { created = true; });
     try {
+      // Finish exclusive creation before consuming input so early stream errors
+      // cannot race file creation and leave an empty upload behind.
+      const handle = await open(path, 'wx');
+      created = true;
+      const output = handle.createWriteStream();
       await pipeline(input, limit, output);
     } catch (error) {
       if (created) await rm(path, { force: true });

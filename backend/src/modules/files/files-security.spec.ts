@@ -25,6 +25,14 @@ describe('KYC immutable storage with actual local files', () => {
     await expect(files.saveLocalUpload(grant.token, 'application/pdf', Readable.from(pdf))).rejects.toThrow();
     await expect(files.statObject(final.objectKey)).resolves.toMatchObject({ sizeBytes: pdf.length });
   });
+  it('preserves the original upload when an exclusive-create retry fails', async () => {
+    const grant = await upload();
+    await expect(files.saveLocalUpload(grant.token, 'application/pdf', Readable.from(pdf))).rejects.toThrow();
+    await expect(files.statObject(grant.objectKey)).resolves.toMatchObject({ sizeBytes: pdf.length });
+    await expect(files.finalizeUpload(grant.objectKey, 'application/pdf', pdf.length)).resolves.toMatchObject({
+      sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+  });
   it('rejects spoofed MIME bytes, truncation, size lies and checksum lies', async () => {
     const bad = await upload(Buffer.from('<script>bad</script>'));
     await expect(files.finalizeUpload(bad.objectKey, 'application/pdf', 20)).rejects.toThrow();
