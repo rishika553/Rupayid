@@ -10,6 +10,8 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const { method, url, ip } = request;
+    // Query strings can contain signed file tokens and customer search data.
+    const logUrl = url.split('?')[0];
     const userId = request.user?.id || 'anonymous';
     const now = Date.now();
 
@@ -19,9 +21,9 @@ export class LoggingInterceptor implements NestInterceptor {
         const statusCode = context.switchToHttp().getResponse().statusCode;
 
         if (elapsed > 1000) {
-          this.logger.warn(`${method} ${url} ${statusCode} ${elapsed}ms user=${userId} ip=${ip}`);
+          this.logger.warn(`${method} ${logUrl} ${statusCode} ${elapsed}ms user=${userId} ip=${ip}`);
         } else {
-          this.logger.log(`${method} ${url} ${statusCode} ${elapsed}ms user=${userId}`);
+          this.logger.log(`${method} ${logUrl} ${statusCode} ${elapsed}ms user=${userId}`);
         }
       }),
     );

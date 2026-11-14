@@ -38,7 +38,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = (obj.error as string) || error;
       }
     } else if (exception instanceof Error) {
-      message = exception.message;
       this.logger.error(`Unhandled error: ${exception.message}`, exception.stack);
     }
 
@@ -48,7 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       message,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: request.url.split('?')[0],
     });
   }
 }

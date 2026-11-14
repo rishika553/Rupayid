@@ -6,11 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "rupayaid",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0284C7"
+      "backgroundColor": "#0866D9"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0284C7"
+        "backgroundColor": "#0866D9"
       },
       "package": "com.rupayaid.app",
       "usesCleartextTraffic": true,
@@ -51,7 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0284C7",
+          "backgroundColor": "#0866D9",
           "image": "./assets/splash.png",
           "imageWidth": 200
         }

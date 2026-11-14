@@ -4,23 +4,40 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-const rootRequire = require('node:module').createRequire(path.resolve(__dirname, '../../package.json'));
-const rendererRequire = require('node:module').createRequire(rootRequire.resolve('react-dom/package.json'));
+const rootRequire = require('node:module').createRequire(
+  path.resolve(__dirname, '../../package.json'),
+);
+const rendererRequire = require('node:module').createRequire(
+  rootRequire.resolve('react-dom/package.json'),
+);
 const React = rendererRequire('react');
 const { renderToString } = rootRequire('react-dom/server');
 
 const deferred = () => {
   let resolve;
-  const promise = new Promise(r => { resolve = r; });
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 };
-const response = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
-const auth = id => ({ accessToken: `${id}-access`, refreshToken: `${id}-refresh`, user: { id } });
-const tick = () => new Promise(resolve => setImmediate(resolve));
+const response = (status, data) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => data,
+});
+const auth = (id) => ({ accessToken: `${id}-access`, refreshToken: `${id}-refresh`, user: { id } });
+const tick = () => new Promise((resolve) => setImmediate(resolve));
 const keys = [
-  ['dashboard', 'customer'], ['kyc', 'my'], ['kyc', 'status'],
-  ['loans', 'my'], ['loans', 'track', 'me'], ['loans', 'repayment-schedule', 'a-loan'],
-  ['payments', 'me'], ['customers', 'me'], ['notifications', 'me'], ['referrals', 'me'],
+  ['dashboard', 'customer'],
+  ['kyc', 'my'],
+  ['kyc', 'status'],
+  ['loans', 'my'],
+  ['loans', 'track', 'me'],
+  ['loans', 'repayment-schedule', 'a-loan'],
+  ['payments', 'me'],
+  ['customers', 'me'],
+  ['notifications', 'me'],
+  ['referrals', 'me'],
 ];
 
 // Execute production TS with real TanStack Query; mock only native storage,
@@ -29,9 +46,12 @@ function harness() {
   const modules = new Map();
   const calls = [];
   let saved = null;
-  let write = async tokens => { saved = tokens; };
+  let write = async (tokens) => {
+    saved = tokens;
+  };
   let route = async (endpoint, options) => {
-    if (endpoint === '/auth/login') return response(200, { data: auth(JSON.parse(options.body).email) });
+    if (endpoint === '/auth/login')
+      return response(200, { data: auth(JSON.parse(options.body).email) });
     if (endpoint === '/auth/logout') return response(200, { data: {} });
     throw new Error(`Unexpected request ${endpoint}`);
   };
@@ -40,18 +60,28 @@ function harness() {
   let slotRenders = 0;
   const storage = {
     readAuth: async () => saved,
-    writeAuth: tokens => write(tokens),
-    clearAuth: async () => { saved = null; },
+    writeAuth: (tokens) => write(tokens),
+    clearAuth: async () => {
+      saved = null;
+    },
   };
   const overrides = {
     '@/auth/auth-context': {
-      useAuth: () => ({ ...session.getSnapshot(), isAuthenticated: Boolean(session.getSnapshot().user), refreshUser: session.refreshUser, logout: session.logout }),
+      useAuth: () => ({
+        ...session.getSnapshot(),
+        isAuthenticated: Boolean(session.getSnapshot().user),
+        refreshUser: session.refreshUser,
+        logout: session.logout,
+      }),
       AuthProvider: ({ children }) => children,
     },
     'expo-router': {
       useSegments: () => segments,
       useRouter: () => ({ replace() {} }),
-      Slot: () => { slotRenders++; return React.createElement('span', null, 'screen'); },
+      Slot: () => {
+        slotRenders++;
+        return React.createElement('span', null, 'screen');
+      },
     },
     'expo-status-bar': { StatusBar: () => null },
     'react-native': {
@@ -66,37 +96,74 @@ function harness() {
     const exports = {};
     modules.set(filename, exports);
     const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        jsx: ts.JsxEmit.ReactJSX,
+      },
     }).outputText;
-    vm.runInNewContext(code, {
-      exports, process, __DEV__: false, console, setTimeout, clearTimeout, AbortController, URLSearchParams,
-      fetch: async (url, options) => {
-        const endpoint = new URL(url).pathname.replace('/api/v1', '');
-        calls.push({ endpoint, ...options });
-        return route(endpoint, options);
+    vm.runInNewContext(
+      code,
+      {
+        exports,
+        process,
+        __DEV__: false,
+        console,
+        setTimeout,
+        clearTimeout,
+        AbortController,
+        URLSearchParams,
+        XMLHttpRequest: function () {
+          return new overrides.XMLHttpRequest();
+        },
+        fetch: async (url, options) => {
+          if (String(url).startsWith('file://'))
+            return { ok: true, blob: async () => ({ size: 128 }) };
+          const endpoint = new URL(url).pathname.replace('/api/v1', '');
+          calls.push({ endpoint, ...options });
+          return route(endpoint, options);
+        },
+        require: (name) => {
+          if (name.endsWith('secure-storage')) return storage;
+          if (overrides[name]) return overrides[name];
+          if (name === '@/api/client') return load('src/api/client.ts');
+          if (name === 'react' || name.startsWith('react/')) return rendererRequire(name);
+          return require(name);
+        },
       },
-      require: name => {
-        if (name.endsWith('secure-storage')) return storage;
-        if (overrides[name]) return overrides[name];
-        if (name === '@/api/client') return load('src/api/client.ts');
-        if (name === 'react' || name.startsWith('react/')) return rendererRequire(name);
-        return require(name);
-      },
-    }, { filename });
+      { filename },
+    );
     return exports;
   }
   const { AuthSession } = load('src/auth/session.ts');
   session = new AuthSession();
   const { requireApi } = load('src/api/client.ts');
   return {
-    session, calls, requireApi, load,
-    mock(name, value) { overrides[name] = value; },
-    get saved() { return saved; },
-    set saved(value) { saved = value; },
-    set route(value) { route = value; },
-    set write(value) { write = value; },
-    store: tokens => { saved = tokens; },
-    seed() { for (const key of keys) session.getSnapshot().queryClient.setQueryData(key, { owner: 'A' }); },
+    session,
+    calls,
+    requireApi,
+    load,
+    mock(name, value) {
+      overrides[name] = value;
+    },
+    get saved() {
+      return saved;
+    },
+    set saved(value) {
+      saved = value;
+    },
+    set route(value) {
+      route = value;
+    },
+    set write(value) {
+      write = value;
+    },
+    store: (tokens) => {
+      saved = tokens;
+    },
+    seed() {
+      for (const key of keys) session.getSnapshot().queryClient.setQueryData(key, { owner: 'A' });
+    },
     render(group = '(app)') {
       segments = [group];
       slotRenders = 0;
@@ -153,7 +220,8 @@ test('logout followed by another login cannot reuse cached customer information'
   h.seed();
   await h.session.logout();
   await h.session.signIn('B', 'password');
-  for (const key of keys) assert.equal(h.session.getSnapshot().queryClient.getQueryData(key), undefined);
+  for (const key of keys)
+    assert.equal(h.session.getSnapshot().queryClient.getQueryData(key), undefined);
 });
 
 test('late query response is aborted and cannot repopulate the new account cache', async () => {
@@ -161,10 +229,15 @@ test('late query response is aborted and cannot repopulate the new account cache
   await h.session.signIn('A', 'password');
   const old = h.session.getSnapshot();
   const delayed = deferred();
-  h.route = endpoint => endpoint === '/dashboard' ? delayed.promise : response(200, { data: auth('B') });
-  const query = old.queryClient.fetchQuery({
-    queryKey: keys[0], queryFn: () => h.requireApi(old.client.get('/dashboard')), retry: false,
-  }).catch(error => error);
+  h.route = (endpoint) =>
+    endpoint === '/dashboard' ? delayed.promise : response(200, { data: auth('B') });
+  const query = old.queryClient
+    .fetchQuery({
+      queryKey: keys[0],
+      queryFn: () => h.requireApi(old.client.get('/dashboard')),
+      retry: false,
+    })
+    .catch((error) => error);
   const request = h.calls.at(-1);
   await h.session.signIn('B', 'password');
   assert.equal(request.signal.aborted, true);
@@ -190,7 +263,9 @@ test('failed account switching leaves no old user, cached data or tokens', async
 
 test('token persistence failure never publishes an authenticated account', async () => {
   const h = harness();
-  h.write = async () => { throw new Error('Storage unavailable'); };
+  h.write = async () => {
+    throw new Error('Storage unavailable');
+  };
   await assert.rejects(h.session.signIn('A', 'password'), /Storage unavailable/);
   assert.equal(h.session.getSnapshot().user, null);
   assert.equal(h.saved, null);
@@ -202,8 +277,11 @@ for (const failure of ['rejected', 'retry401', 'storage']) {
     const h = harness();
     await h.session.signIn('A', 'password');
     h.seed();
-    if (failure === 'storage') h.write = async () => { throw new Error('Storage unavailable'); };
-    h.route = async endpoint => {
+    if (failure === 'storage')
+      h.write = async () => {
+        throw new Error('Storage unavailable');
+      };
+    h.route = async (endpoint) => {
       if (endpoint === '/auth/refresh') {
         if (failure === 'rejected') return response(401, { message: 'Expired' });
         return response(200, { data: auth('rotated') });
@@ -229,11 +307,12 @@ test('successful concurrent refresh shares one request and preserves the current
   h.route = (endpoint, options) => {
     if (endpoint === '/auth/refresh') return refreshed.promise;
     return options.headers.Authorization === 'Bearer rotated-access'
-      ? response(200, { data: { owner: 'A' } }) : response(401, {});
+      ? response(200, { data: { owner: 'A' } })
+      : response(401, {});
   };
   const requests = [current.client.get('/dashboard'), current.client.get('/kyc/me')];
   await tick();
-  assert.equal(h.calls.filter(c => c.endpoint === '/auth/refresh').length, 1);
+  assert.equal(h.calls.filter((c) => c.endpoint === '/auth/refresh').length, 1);
   refreshed.resolve(response(200, { data: auth('rotated') }));
   for (const result of await Promise.all(requests)) assert.equal(result.success, true);
   assert.equal(h.session.getSnapshot().id, current.id);
@@ -246,7 +325,7 @@ test('late refresh success or 401 from A cannot overwrite or sign out B', async 
     const h = harness();
     await h.session.signIn('A', 'password');
     const delayed = deferred();
-    h.route = endpoint => {
+    h.route = (endpoint) => {
       if (endpoint === '/auth/login') return response(200, { data: auth('B') });
       if (endpoint === '/auth/refresh') return delayed.promise;
       return response(401, {});
@@ -265,11 +344,11 @@ test('in-progress refresh storage write is ordered before logout deletion and B 
   const h = harness();
   await h.session.signIn('A', 'password');
   const blocked = deferred();
-  h.write = async tokens => {
+  h.write = async (tokens) => {
     if (tokens.accessToken === 'A-rotated-access') await blocked.promise;
     h.store(tokens);
   };
-  h.route = endpoint => {
+  h.route = (endpoint) => {
     if (endpoint === '/auth/login') return response(200, { data: auth('B') });
     if (endpoint === '/auth/logout') return response(200, { data: {} });
     if (endpoint === '/auth/refresh') return response(200, { data: auth('A-rotated') });
@@ -290,7 +369,9 @@ test('late login cannot restore a session after logout or a newer login', async 
   const delayed = deferred();
   h.route = (endpoint, options) => {
     if (endpoint === '/auth/logout') return response(200, { data: {} });
-    return JSON.parse(options.body).email === 'A' ? delayed.promise : response(200, { data: auth('B') });
+    return JSON.parse(options.body).email === 'A'
+      ? delayed.promise
+      : response(200, { data: auth('B') });
   };
   const oldLogin = h.session.signIn('A', 'password');
   const rejected = assert.rejects(oldLogin, /Session ended/);
@@ -307,7 +388,9 @@ test('restoration gates protected screens; transient network failures do not era
   const h = harness();
   h.saved = auth('A');
   assert.equal(h.render().slotRenders, 0);
-  h.route = async () => { throw new Error('Offline'); };
+  h.route = async () => {
+    throw new Error('Offline');
+  };
   await h.session.refreshUser();
   assert.equal(h.render().slotRenders, 0);
   assert.match(h.render().html, /Retry/);
@@ -342,7 +425,8 @@ for (const failure of ['network', 'timeout', 'server', 'rateLimit', 'malformed']
     h.route = (endpoint, options) => {
       if (endpoint === '/auth/refresh') return response(200, { data: auth('rotated') });
       return options.headers.Authorization === 'Bearer rotated-access'
-        ? response(200, { data: { owner: 'A' } }) : response(401, {});
+        ? response(200, { data: { owner: 'A' } })
+        : response(401, {});
     };
     assert.equal((await original.client.get('/dashboard')).success, true);
     assert.equal(h.saved.refreshToken, 'rotated-refresh');
@@ -385,7 +469,9 @@ test('ordinary 403 and network errors do not log out an authenticated user', asy
   const current = h.session.getSnapshot();
   h.route = () => response(403, { message: 'Forbidden' });
   assert.equal((await current.client.get('/kyc/me')).success, false);
-  h.route = async () => { throw new Error('Offline'); };
+  h.route = async () => {
+    throw new Error('Offline');
+  };
   assert.equal((await current.client.get('/dashboard')).success, false);
   assert.equal(h.session.getSnapshot().id, current.id);
   assert.equal(h.session.getSnapshot().user.id, 'A');
@@ -397,14 +483,26 @@ test('KYC upload completes normally but a delayed upload cannot register documen
     await h.session.signIn('A', 'password');
     const client = h.session.getSnapshot().client;
     const uploaded = deferred();
-    h.mock('expo-file-system/legacy', {
-      FileSystemUploadType: { BINARY_CONTENT: 0 },
-      createUploadTask: () => ({ uploadAsync: () => uploaded.promise }),
-    });
-    h.route = endpoint => {
+    h.mock(
+      'XMLHttpRequest',
+      class {
+        upload = {};
+        open() {}
+        setRequestHeader() {}
+        send() {
+          uploaded.promise.then(({ status }) => {
+            this.status = status;
+            this.onload();
+          });
+        }
+      },
+    );
+    h.route = (endpoint) => {
       if (endpoint === '/auth/login') return response(200, { data: auth('B') });
       if (endpoint === '/kyc/documents/upload-url') {
-        return response(200, { data: { uploadUrl: 'https://storage.invalid/document', objectKey: 'A/document' } });
+        return response(200, {
+          data: { uploadUrl: 'https://storage.invalid/document', objectKey: 'A/document' },
+        });
       }
       if (endpoint === '/kyc/documents') return response(200, { data: {} });
       throw new Error(`Unexpected ${endpoint}`);
@@ -416,7 +514,7 @@ test('KYC upload completes normally but a delayed upload cannot register documen
     if (switchAccount) await h.session.signIn('B', 'password');
     uploaded.resolve({ status: 200 });
     await result;
-    const registrations = h.calls.filter(c => c.endpoint === '/kyc/documents');
+    const registrations = h.calls.filter((c) => c.endpoint === '/kyc/documents');
     assert.equal(registrations.length, switchAccount ? 0 : 1);
     if (!switchAccount) assert.equal(registrations[0].headers.Authorization, 'Bearer A-access');
   }
@@ -427,7 +525,13 @@ test('registration and Google authentication establish isolated sessions using t
   await h.session.signIn('A', 'password');
   h.seed();
   h.route = () => response(200, { data: auth('B') });
-  await h.session.createAccount({ firstName: 'B', lastName: 'Test', email: 'b@example.test', password: 'password', referralCode: 'REF' });
+  await h.session.createAccount({
+    firstName: 'B',
+    lastName: 'Test',
+    email: 'b@example.test',
+    password: 'password',
+    referralCode: 'REF',
+  });
   assert.equal(h.calls.at(-1).endpoint, '/auth/register');
   assert.equal(JSON.parse(h.calls.at(-1).body).referralCode, 'REF');
   assert.equal(h.session.getSnapshot().queryClient.getQueryCache().getAll().length, 0);

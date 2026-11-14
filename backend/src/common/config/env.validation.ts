@@ -162,6 +162,20 @@ class EnvironmentVariables {
 }
 
 export function validate(config: Record<string, unknown>) {
+  if (config.NODE_ENV === Environment.Production) {
+    const required = ['DATABASE_URL', 'JWT_SECRET', 'REFRESH_TOKEN_SECRET', 'CORS_ORIGIN'];
+    const invalid = required.filter((key) =>
+      typeof config[key] !== 'string' || !(config[key] as string).trim(),
+    );
+    for (const key of ['JWT_SECRET', 'REFRESH_TOKEN_SECRET']) {
+      if (typeof config[key] === 'string' && (config[key] as string).trim().length < 32) {
+        invalid.push(key);
+      }
+    }
+    if (invalid.length) {
+      throw new Error(`Invalid production configuration: ${[...new Set(invalid)].join(', ')}`);
+    }
+  }
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
@@ -171,7 +185,7 @@ export function validate(config: Record<string, unknown>) {
   });
 
   if (errors.length > 0) {
-    throw new Error(`Environment validation error:\n${errors.toString()}`);
+    throw new Error(`Environment validation error: ${errors.map((error) => error.property).join(', ')}`);
   }
 
   return validatedConfig;

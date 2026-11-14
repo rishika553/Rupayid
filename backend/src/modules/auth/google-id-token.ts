@@ -1,3 +1,4 @@
+import { boundedFetch } from '../../common/http/bounded-fetch';
 import { UnauthorizedException } from '@nestjs/common';
 
 export type GoogleIdentity = {
@@ -19,7 +20,7 @@ type GoogleTokenInfo = {
 };
 
 export async function verifyGoogleIdToken(idToken: string, clientId: string): Promise<GoogleIdentity> {
-  const response = await fetch(
+  const response = await boundedFetch(
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
   );
   if (!response.ok) {

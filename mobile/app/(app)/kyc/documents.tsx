@@ -2,9 +2,17 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import { useMyKyc, useAddKycDocument, useSubmitKyc } from '@/hooks/use-customer-data';
+import { useMyKyc, useAddKycDocument } from '@/hooks/use-customer-data';
 import { KYC_DOCUMENT_TYPES, ALLOWED_KYC_MIME, MAX_KYC_FILE_BYTES, isKycEditable } from '@/lib/kyc';
-import { ScreenWrapper, Card, Button, Badge, LoadingScreen } from '@/ui/components';
+import { errorMessage } from '@/lib/error-message';
+import {
+  ScreenWrapper,
+  Button,
+  LoadingScreen,
+  DocumentUploadCard,
+  StepIndicator,
+  ErrorState,
+} from '@/ui/components';
 import { colors, font, spacing } from '@/ui/theme';
 
 const DOC_LABELS: Record<string, string> = {
@@ -14,9 +22,8 @@ const DOC_LABELS: Record<string, string> = {
 
 export default function KycDocumentsScreen() {
   const router = useRouter();
-  const { data: kycList, isLoading } = useMyKyc();
+  const { data: kycList, isLoading, error, refetch } = useMyKyc();
   const addDoc = useAddKycDocument();
-  const submitKyc = useSubmitKyc();
   const [uploading, setUploading] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
@@ -47,26 +54,27 @@ export default function KycDocumentsScreen() {
         onProgress: setProgress,
       });
       setUploading(null);
-    } catch (e: any) {
+    } catch (e) {
       setUploading(null);
-      Alert.alert('Upload failed', e.message || 'Could not upload document');
-    }
-  };
-
-  const handleSubmit = async () => {
-    try {
-      await submitKyc.mutateAsync();
-      Alert.alert('Submitted', 'Your KYC has been submitted for review.');
-      router.replace('/(app)/kyc');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not submit KYC');
+      Alert.alert('Upload failed', errorMessage(e, 'Could not upload document'));
     }
   };
 
   if (isLoading) return <LoadingScreen />;
 
+  if (error)
+    return (
+      <ScreenWrapper>
+        <ErrorState message="We couldn't load your documents." onRetry={() => void refetch()} />
+      </ScreenWrapper>
+    );
+
   return (
     <ScreenWrapper>
+      <StepIndicator
+        steps={['Personal', 'Address', 'Identity', 'Bank', 'Documents', 'Review']}
+        current={5}
+      />
       <Text style={s.title}>Upload Documents</Text>
       <Text style={s.subtitle}>Upload at least one identity document to proceed.</Text>
 
@@ -74,32 +82,26 @@ export default function KycDocumentsScreen() {
         const existing = existingDocs.find((d) => d.documentType === docType);
         const isUploading = uploading === docType;
         return (
-          <Card key={docType}>
-            <View style={s.docRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.docLabel}>{DOC_LABELS[docType] || docType}</Text>
-                {existing ? (
-                  <Badge text="Uploaded" variant="success" />
-                ) : null}
-              </View>
-              {editable && (
-                <Button
-                  title={isUploading ? `${progress}%` : existing ? 'Replace' : 'Upload'}
-                  variant={existing ? 'outline' : 'primary'}
-                  onPress={() => pickAndUpload(docType)}
-                  loading={isUploading}
-                  disabled={!!uploading}
-                  style={{ minHeight: 36, paddingHorizontal: 16, paddingVertical: 8 }}
-                />
-              )}
-            </View>
-          </Card>
+          <DocumentUploadCard
+            key={docType}
+            title={DOC_LABELS[docType] || docType}
+            uploaded={!!existing}
+            uploading={isUploading}
+            progress={progress}
+            disabled={!!uploading}
+            editable={editable}
+            onUpload={() => void pickAndUpload(docType)}
+          />
         );
       })}
 
       {editable && existingDocs.length > 0 && (
         <View style={s.footer}>
-          <Button title="Review & Submit KYC" onPress={handleSubmit} loading={submitKyc.isPending} />
+          <Button
+            title="Review & Submit KYC"
+            onPress={() => router.push('/(app)/kyc/review')}
+            disabled={!!uploading}
+          />
         </View>
       )}
     </ScreenWrapper>

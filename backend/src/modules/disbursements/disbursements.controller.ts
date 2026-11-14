@@ -1,3 +1,4 @@
+import { CreateDisbursementDto, UpdateDisbursementDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DisbursementsService } from './disbursements.service';
@@ -17,14 +18,7 @@ export class DisbursementsController {
   @Post()
   @ApiOperation({ summary: 'Initiate a disbursement' })
   async initiate(
-    @Body() data: {
-      loanApplicationId: string;
-      amount: number;
-      method: string;
-      beneficiaryBankName?: string;
-      beneficiaryAccount?: string;
-      beneficiaryIfsc?: string;
-    },
+    @Body() data: CreateDisbursementDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.disbursementsService.initiate(data.loanApplicationId, {
@@ -50,7 +44,7 @@ export class DisbursementsController {
   @ApiOperation({ summary: 'Update disbursement status' })
   async updateStatus(
     @Param('id') id: string,
-    @Body() data: { status: string; providerReference?: string },
+    @Body() data: UpdateDisbursementDto,
   ) {
     return this.disbursementsService.updateStatus(id, data.status, data.providerReference);
   }

@@ -1,3 +1,4 @@
+import { UpdateUserDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Patch, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -31,7 +32,7 @@ export class UserController {
   @ApiOperation({ summary: 'Update a user (staff only)' })
   async update(
     @Param('id') id: string,
-    @Body() data: { firstName?: string; lastName?: string; phoneNumber?: string },
+    @Body() data: UpdateUserDto,
   ) {
     return this.userService.update(id, data);
   }

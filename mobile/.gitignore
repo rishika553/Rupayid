@@ -19,3 +19,9 @@ google-services.json
 
 expo-env.d.ts
 # @end expo-cli
+# Local Android verification output
+/dist-android/
+/emulator-out.log
+/emulator-error.log
+/review-screen.png
+/review-ui.xml

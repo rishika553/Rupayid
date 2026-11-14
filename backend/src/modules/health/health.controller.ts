@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Logger, Post, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -64,7 +64,7 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: 'ready' };
     } catch {
-      return { status: 'not ready' };
+      throw new ServiceUnavailableException('Database is not ready');
     }
   }
 

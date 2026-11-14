@@ -48,7 +48,12 @@ export function LoanApplyForm() {
   const updateDraft = useUpdateLoanDraft();
   const submitLoan = useSubmitLoanApplication();
   const evaluateEligibility = useEvaluateEligibility();
-  const products = Array.isArray(productsQuery.data) ? productsQuery.data : [];
+  // Stabilise the array reference so the `selectedProduct` useMemo deps below
+  // don't change every render.
+  const products = useMemo(
+    () => (Array.isArray(productsQuery.data) ? productsQuery.data : []),
+    [productsQuery.data],
+  );
   const existingDraft = (loansQuery.data || []).find((row) => row.status === 'DRAFT');
   const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
@@ -85,7 +90,11 @@ export function LoanApplyForm() {
       employmentType: '',
       monthlyIncome: undefined,
     });
-  }, [existingDraft?.id, existingDraft?.amountRequested, existingDraft?.tenureMonths, form]);
+    // Key off the draft's identity + the two scalar fields we actually read.
+    // Depending on the whole `existingDraft` object would reset the form on
+    // every refetch (new object ref, same content).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingDraft?.id, existingDraft?.amountRequested, existingDraft?.tenureMonths]);
 
   const watchedAmount = form.watch('amountRequested');
   const selectedProduct = useMemo(() => {
@@ -136,6 +145,11 @@ export function LoanApplyForm() {
       cancelled = true;
       window.clearTimeout(timer);
     };
+    // Debounced eligibility check: only re-run when the chosen product or the
+    // user-entered income/employment change. `evaluateEligibility` is a mutation
+    // hook whose reference is unstable across renders — including it would
+    // re-fire this effect on every render and hammer the API.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProduct?.id, watchedIncome, watchedEmployment]);
 
   async function onSubmit(values: FormValues) {

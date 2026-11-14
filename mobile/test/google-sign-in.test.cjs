@@ -1,75 +1,107 @@
-const { test } = require('node:test');
+﻿const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-
-function load({ native = true, clientId = 'web-client', result = { type: 'success', data: { idToken: 'google-id-token' } }, error, playServicesError } = {}) {
+function load({
+  native = true,
+  os = 'android',
+  web = 'web-client',
+  android = 'android-client',
+  ios = 'ios-client',
+} = {}) {
   const calls = [];
-  const sdk = {
-    GoogleSignin: {
-      configure: value => calls.push(['configure', value]),
-      hasPlayServices: async () => { calls.push(['playServices']); if (playServicesError) throw playServicesError; },
-      signIn: async () => { calls.push(['signIn']); if (error) throw error; return result; },
-    },
-    isErrorWithCode: value => Boolean(value && typeof value.code === 'string'),
-    statusCodes: { SIGN_IN_CANCELLED: 'cancelled', IN_PROGRESS: 'in-progress', PLAY_SERVICES_NOT_AVAILABLE: 'no-play-services' },
-  };
-  const filename = path.resolve(__dirname, '../src/auth/google-sign-in.ts');
+  const errors = [];
+  const Provider = () => null;
+  const filename = path.resolve(__dirname, '../src/auth/google-sign-in-button.tsx');
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      jsx: ts.JsxEmit.ReactJSX,
+    },
   }).outputText;
   const exports = {};
   vm.runInNewContext(code, {
     exports,
-    process: { env: { EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: clientId } },
-    require: name => {
-      if (name === 'react-native') return { Platform: { OS: 'android' }, TurboModuleRegistry: { get: () => native ? {} : null } };
-      assert.equal(name, '@react-native-google-signin/google-signin');
-      calls.push(['loadSdk']);
-      return sdk;
+    process: {
+      env: {
+        EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: web,
+        EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: android,
+        EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ios,
+      },
+    },
+    require: (name) => {
+      if (name === 'react/jsx-runtime')
+        return {
+          jsx: (type, props) => ({ type, props }),
+          jsxs: (type, props) => ({ type, props }),
+        };
+      if (name === 'react-native')
+        return {
+          Platform: { OS: os },
+          StyleSheet: { create: (s) => s },
+          Text: 'Text',
+          TouchableOpacity: 'Button',
+        };
+      if (name === 'expo-modules-core')
+        return { requireOptionalNativeModule: () => (native ? {} : null) };
+      if (name === '@/ui/theme') return { colors: {}, font: {}, radius: {} };
+      assert.equal(name, './google-sign-in-provider');
+      calls.push('provider');
+      return { GoogleSignInProvider: Provider };
     },
   });
-  return { getToken: exports.getGoogleIdToken, calls };
+  const props = { onError: (message) => errors.push(message), onBusyChange() {} };
+  return {
+    render: (extra) => exports.GoogleSignInButton({ ...props, ...extra }),
+    calls,
+    errors,
+    Provider,
+    props,
+  };
 }
-
-test('Expo Go reports an unavailable preview without loading the native SDK', async () => {
+test('Expo Go without ExpoApplication renders email-safe fallback without loading Google provider', () => {
   const h = load({ native: false });
-  await assert.rejects(h.getToken(), /unavailable in this preview/);
+  const button = h.render();
+  assert.equal(button.type, 'Button');
+  assert.equal(h.calls.length, 0);
+  button.props.onPress();
+  assert.match(h.errors[0], /unavailable in this Expo Go preview/);
+});
+test('missing web configuration cannot load the provider', () => {
+  const h = load({ web: '' });
+  h.render().props.onPress();
+  assert.match(h.errors[0], /not configured/);
   assert.equal(h.calls.length, 0);
 });
-
-test('missing configuration does not attempt Google authentication', async () => {
-  const h = load({ clientId: '' });
-  await assert.rejects(h.getToken(), /not available yet/);
+test('missing Android configuration gives an actionable fallback', () => {
+  const h = load({ android: '' });
+  h.render().props.onPress();
+  assert.match(h.errors[0], /email sign-in/);
   assert.equal(h.calls.length, 0);
 });
-
-test('requests a Google ID token with the same web audience used by the backend', async () => {
+test('configured Android forwards existing callbacks to the unchanged provider', () => {
   const h = load();
-  assert.equal(await h.getToken(), 'google-id-token');
-  assert.equal(h.calls[1][1].webClientId, 'web-client');
-  assert.equal(h.calls[1][1].offlineAccess, false);
-  assert.deepEqual(h.calls.map(c => c[0]), ['loadSdk', 'configure', 'playServices', 'signIn']);
+  const result = h.render();
+  assert.equal(result.type, h.Provider);
+  assert.equal(result.props.onError, h.props.onError);
+  assert.equal(result.props.onBusyChange, h.props.onBusyChange);
+  assert.deepEqual(h.calls, ['provider']);
 });
-
-test('cancelling account selection produces no credential', async () => {
-  assert.equal(await load({ result: { type: 'cancelled' } }).getToken(), null);
-  assert.equal(await load({ error: { code: 'cancelled' } }).getToken(), null);
+test('fallback respects disabled state during email authentication', () => {
+  const h = load({ native: false });
+  const result = h.render({ disabled: true });
+  assert.equal(result.props.disabled, true);
+  assert.equal(result.props.accessibilityState.disabled, true);
 });
-
-test('missing ID token cannot be treated as an authenticated account', async () => {
-  await assert.rejects(load({ result: { type: 'success', data: { idToken: null } } }).getToken(), /Could not sign in/);
+test('web only needs the web client and does not require an Android native module', () => {
+  const h = load({ os: 'web', native: false, android: '', ios: '' });
+  assert.equal(h.render().type, h.Provider);
 });
-
-test('unavailable Play Services gives an actionable error without signing in', async () => {
-  const h = load({ playServicesError: { code: 'no-play-services' } });
-  await assert.rejects(h.getToken(), /Google Play Services is unavailable/);
-  assert.equal(h.calls.some(c => c[0] === 'signIn'), false);
-});
-
-test('duplicate and provider failures return user-facing errors', async () => {
-  await assert.rejects(load({ error: { code: 'in-progress' } }).getToken(), /already in progress/);
-  await assert.rejects(load({ error: { code: 'DEVELOPER_ERROR', message: 'provider internals' } }).getToken(), /Could not sign in with Google/);
+test('iOS uses its own configuration before loading the provider', () => {
+  assert.equal(load({ os: 'ios', ios: '' }).render().type, 'Button');
+  const h = load({ os: 'ios', android: '' });
+  assert.equal(h.render().type, h.Provider);
 });

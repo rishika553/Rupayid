@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/c
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseDurationToMs, sha256 } from './crypto.util';
 import { ACCOUNT_BLOCKED, BLOCKED_USER_STATUSES } from './auth.constants';
@@ -33,17 +34,19 @@ export class SessionService {
   ) {}
 
   async issueCustomerSession(userId: string, ip: string, userAgent?: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: SELECT_USER });
+    return this.withUserLock(userId, async (db) => {
+    const user = await db.user.findUnique({ where: { id: userId }, select: SELECT_USER });
     if (!user || this.isBlocked(user.status) || user.status !== 'ACTIVE') {
       throw new ForbiddenException(ACCOUNT_BLOCKED);
     }
 
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { lastLoginAt: new Date() },
     });
 
-    return this.createSessionPair(user, ip, userAgent);
+    return this.createSessionPair(user, ip, userAgent, db);
+    });
   }
 
   async refresh(refreshToken: string, ip: string, userAgent?: string) {
@@ -56,42 +59,54 @@ export class SessionService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (payload.typ !== 'refresh') {
+    if (payload.typ !== 'refresh' || !payload.sub || !payload.sid || !payload.familyId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const session = await this.prisma.session.findUnique({ where: { id: payload.sid } });
+    const result = await this.withUserLock(payload.sub, async (db) => {
+    const session = await db.session.findUnique({ where: { id: payload.sid } });
     if (
       !session ||
-      session.status !== 'ACTIVE' ||
+      session.userId !== payload.sub ||
+      (session.metadata as { familyId?: string } | null)?.familyId !== payload.familyId ||
       session.tokenType !== 'REFRESH' ||
       session.tokenSha256 !== sha256(refreshToken) ||
       session.expiresAt <= new Date()
     ) {
-      if (session?.status === 'ACTIVE') {
-        await this.revokeFamily(payload.sub, payload.familyId, 'refresh_reuse_or_invalid');
-      }
+      return { error: 'invalid' } as const;
+    }
+
+    if (session.status !== 'ACTIVE') {
+      await this.revokeFamily(payload.sub, payload.familyId, 'refresh_reuse', db);
+      return { error: 'invalid' } as const;
+    }
+
+    const user = await db.user.findUnique({ where: { id: payload.sub }, select: SELECT_USER });
+    if (!user || this.isBlocked(user.status) || user.status !== 'ACTIVE') {
+      await this.revokeFamily(payload.sub, payload.familyId, 'account_status', db);
+      return { error: 'blocked' } as const;
+    }
+
+    await this.revokeFamily(user.id, payload.familyId, 'rotated', db);
+
+    return { tokens: await this.createSessionPair(user, ip, userAgent, db, payload.familyId) };
+    });
+    // Throw only after committing revocation; throwing inside would roll it back.
+    if ('error' in result) {
+      if (result.error === 'blocked') throw new ForbiddenException(ACCOUNT_BLOCKED);
       throw new UnauthorizedException('Invalid refresh token');
     }
-
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: SELECT_USER });
-    if (!user || this.isBlocked(user.status) || user.status !== 'ACTIVE') {
-      await this.revokeFamily(payload.sub, payload.familyId, 'account_status');
-      throw new ForbiddenException(ACCOUNT_BLOCKED);
-    }
-
-    await this.revokeFamily(user.id, payload.familyId, 'rotated');
-
-    return this.createSessionPair(user, ip, userAgent);
+    return result.tokens;
   }
 
   async logout(userId: string, familyId?: string) {
+    return this.withUserLock(userId, async (db) => {
     if (familyId) {
-      await this.revokeFamily(userId, familyId, 'logout');
+      await this.revokeFamily(userId, familyId, 'logout', db);
       return { success: true };
     }
 
-    await this.prisma.session.updateMany({
+    await db.session.updateMany({
       where: { userId, status: 'ACTIVE' },
       data: {
         status: 'LOGGED_OUT',
@@ -100,6 +115,14 @@ export class SessionService {
       },
     });
     return { success: true };
+    });
+  }
+
+  private withUserLock<T>(userId: string, operation: (db: Prisma.TransactionClient) => Promise<T>) {
+    return this.prisma.$transaction(async (db) => {
+      await db.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      return operation(db);
+    });
   }
 
   async getMe(userId: string) {
@@ -142,15 +165,16 @@ export class SessionService {
     user: T,
     ip: string,
     userAgent?: string,
+    db: Prisma.TransactionClient = this.prisma,
+    familyId: string = crypto.randomUUID(),
   ) {
-    const familyId = crypto.randomUUID();
     const now = new Date();
     const accessTtl = parseDurationToMs(this.configService.get<string>('JWT_EXPIRES_IN', '15m'));
     const refreshTtl = parseDurationToMs(
       this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d'),
     );
 
-    const accessSession = await this.prisma.session.create({
+    const accessSession = await db.session.create({
       data: {
         userId: user.id,
         tokenSha256: sha256(`pending-access-${familyId}`),
@@ -162,7 +186,7 @@ export class SessionService {
         metadata: { familyId },
       },
     });
-    const refreshSession = await this.prisma.session.create({
+    const refreshSession = await db.session.create({
       data: {
         userId: user.id,
         tokenSha256: sha256(`pending-refresh-${familyId}`),
@@ -183,12 +207,12 @@ export class SessionService {
       familyId,
     });
 
-    await this.prisma.$transaction([
-      this.prisma.session.update({
+    await Promise.all([
+      db.session.update({
         where: { id: accessSession.id },
         data: { tokenSha256: sha256(tokens.accessToken), lastUsedAt: now },
       }),
-      this.prisma.session.update({
+      db.session.update({
         where: { id: refreshSession.id },
         data: { tokenSha256: sha256(tokens.refreshToken), lastUsedAt: now },
       }),
@@ -245,8 +269,8 @@ export class SessionService {
     return { accessToken, refreshToken };
   }
 
-  private async revokeFamily(userId: string, familyId: string, reason: string) {
-    const sessions = await this.prisma.session.findMany({
+  private async revokeFamily(userId: string, familyId: string, reason: string, db: Prisma.TransactionClient = this.prisma) {
+    const sessions = await db.session.findMany({
       where: { userId, status: 'ACTIVE' },
     });
     const ids = sessions
@@ -260,7 +284,7 @@ export class SessionService {
       return;
     }
 
-    await this.prisma.session.updateMany({
+    await db.session.updateMany({
       where: { id: { in: ids } },
       data: {
         status: reason === 'logout' ? 'LOGGED_OUT' : 'REVOKED',

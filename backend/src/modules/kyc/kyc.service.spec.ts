@@ -63,6 +63,9 @@ function prismaStub() {
       },
     },
     files: {
+      finalKey: (key: string) => key.replace(/^kyc\//, 'kyc-final/'),
+      finalizeUpload: jest.fn(async () => ({ objectKey: 'kyc-final/user-1/kyc-1/file.pdf', sizeBytes: 1200, sha256: 'server-hash' })),
+      deleteFile: jest.fn(async () => undefined),
       getSignedDownloadUrl: jest.fn(async () => ({
         downloadUrl: 'https://signed.example/x',
         expiresInSeconds: 900,
@@ -143,6 +146,21 @@ describe('KycService document confirmation', () => {
     const service = new KycService(stub.prisma as never, stub.files as never, stub.audit as never);
     await expect(service.confirmDocument('user-1', upload)).resolves.toEqual({ id: 'doc-new' });
     expect(stub.files.statObject).toHaveBeenCalledWith(upload.objectKey);
+    expect(stub.prisma.kycDocument.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fileStorageKey: 'kyc-final/user-1/kyc-1/file.pdf', fileSha256: 'server-hash' }) }));
+  });
+
+  it('does not persist a document when final content validation fails', async () => {
+    const stub = prismaStub();
+    stub.files.finalizeUpload.mockRejectedValueOnce(new BadRequestException('Invalid bytes'));
+    await expect(new KycService(stub.prisma as never, stub.files as never, stub.audit as never).confirmDocument('user-1', upload)).rejects.toThrow('Invalid bytes');
+    expect(stub.prisma.kycDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('does not delete immutable bytes after an ambiguous database write failure', async () => {
+    const stub = prismaStub();
+    stub.prisma.kycDocument.create.mockRejectedValueOnce(new Error('write failed'));
+    await expect(new KycService(stub.prisma as never, stub.files as never, stub.audit as never).confirmDocument('user-1', upload)).rejects.toThrow('write failed');
+    expect(stub.files.deleteFile).not.toHaveBeenCalled();
   });
 
   it('rejects a key that was never uploaded', async () => {

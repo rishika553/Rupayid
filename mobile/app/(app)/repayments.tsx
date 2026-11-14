@@ -1,17 +1,46 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import { useMyTrackedLoans, useLoanRepaymentSchedule, useCreateRepaymentPayment, useVerifyRepaymentPayment } from '@/hooks/use-customer-data';
+import {
+  useMyTrackedLoans,
+  useLoanRepaymentSchedule,
+  useCreateRepaymentPayment,
+  useVerifyRepaymentPayment,
+} from '@/hooks/use-customer-data';
 import { useAuth } from '@/auth/auth-context';
 import { openPaymentCheckout } from '@/lib/payment';
-import { ScreenWrapper, Card, Badge, LoadingScreen, EmptyState, SectionHeader, Button } from '@/ui/components';
+import { errorMessage } from '@/lib/error-message';
+import {
+  ScreenWrapper,
+  Card,
+  Badge,
+  LoadingScreen,
+  EmptyState,
+  SectionHeader,
+  Button,
+  ErrorState,
+} from '@/ui/components';
 import { colors, font } from '@/ui/theme';
 
-const PAYABLE_INSTALLMENT = new Set(['DUE', 'PARTIAL', 'OVERDUE', 'PENDING', 'SCHEDULED']);
+const PAYABLE_INSTALLMENT = new Set([
+  'DUE',
+  'PARTIALLY_PAID',
+  'PARTIAL',
+  'OVERDUE',
+  'PENDING',
+  'SCHEDULED',
+]);
 
 export default function RepaymentsScreen() {
-  const { data: loans, isLoading, refetch } = useMyTrackedLoans();
+  const { data: loans, isLoading, refetch, error } = useMyTrackedLoans();
 
   if (isLoading) return <LoadingScreen />;
+
+  if (error)
+    return (
+      <ScreenWrapper>
+        <ErrorState message="Could not load your repayments." onRetry={() => void refetch()} />
+      </ScreenWrapper>
+    );
 
   const activeLoans = (loans ?? []).filter((l) =>
     ['ACTIVE', 'DISBURSED', 'APPROVED'].includes(l.status),
@@ -20,7 +49,10 @@ export default function RepaymentsScreen() {
   if (activeLoans.length === 0) {
     return (
       <ScreenWrapper>
-        <EmptyState title="No Repayments" message="You don't have any active loans with repayment schedules." />
+        <EmptyState
+          title="No Repayments"
+          message="You don't have any active loans with repayment schedules."
+        />
       </ScreenWrapper>
     );
   }
@@ -93,8 +125,8 @@ function LoanScheduleSection({
       } else {
         Alert.alert('Payment cancelled', 'You can retry whenever you are ready.');
       }
-    } catch (err: any) {
-      Alert.alert('Payment error', err?.message || 'Could not start payment');
+    } catch (err) {
+      Alert.alert('Payment error', errorMessage(err, 'Could not start payment'));
     } finally {
       setPayingNumber(null);
     }
@@ -106,7 +138,9 @@ function LoanScheduleSection({
       <Text style={s.appNum}>{appNumber}</Text>
 
       {isLoading ? (
-        <Card><Text style={s.body}>Loading schedule...</Text></Card>
+        <Card>
+          <Text style={s.body}>Loading schedule...</Text>
+        </Card>
       ) : schedule ? (
         <>
           <Card>
@@ -123,7 +157,11 @@ function LoanScheduleSection({
               <Text style={s.nextAmount}>₹{schedule.nextPayment.totalDue}</Text>
               <Text style={s.meta}>Due: {schedule.nextPayment.dueDate.slice(0, 10)}</Text>
               <Button
-                title={payingNumber === schedule.nextPayment.installmentNumber ? 'Opening checkout...' : 'Pay Now'}
+                title={
+                  payingNumber === schedule.nextPayment.installmentNumber
+                    ? 'Opening checkout...'
+                    : 'Pay Now'
+                }
                 onPress={() => handlePay(schedule.nextPayment!.installmentNumber)}
                 loading={payingNumber === schedule.nextPayment.installmentNumber}
                 disabled={payingNumber !== null}
@@ -146,12 +184,22 @@ function LoanScheduleSection({
                     <Text style={s.instAmount}>₹{inst.totalDue}</Text>
                     <Badge
                       text={inst.status}
-                      variant={inst.status === 'PAID' ? 'success' : inst.status === 'OVERDUE' ? 'danger' : inst.status === 'DUE' ? 'warning' : 'neutral'}
+                      variant={
+                        inst.status === 'PAID'
+                          ? 'success'
+                          : inst.status === 'OVERDUE'
+                            ? 'danger'
+                            : inst.status === 'DUE'
+                              ? 'warning'
+                              : 'neutral'
+                      }
                     />
                   </View>
                 </View>
                 <View style={s.breakdown}>
-                  <Text style={s.breakdownText}>P: ₹{inst.principal}  I: ₹{inst.interest}  F: ₹{inst.fees}</Text>
+                  <Text style={s.breakdownText}>
+                    P: ₹{inst.principal} F: ₹{inst.fees}
+                  </Text>
                 </View>
                 {payable && (
                   <Button
@@ -168,7 +216,9 @@ function LoanScheduleSection({
           })}
         </>
       ) : (
-        <Card><Text style={s.body}>Could not load schedule.</Text></Card>
+        <Card>
+          <Text style={s.body}>Could not load schedule.</Text>
+        </Card>
       )}
     </>
   );
@@ -189,7 +239,14 @@ const s = StyleSheet.create({
   totalsRow: { flexDirection: 'row', justifyContent: 'space-around' },
   totalLabel: { fontSize: 11, color: colors.textMuted, textTransform: 'uppercase', ...font.medium },
   totalValue: { fontSize: 15, color: colors.textPrimary, ...font.bold, marginTop: 2 },
-  nextLabel: { fontSize: 12, color: colors.textSecondary, ...font.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  nextLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    ...font.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
   nextAmount: { fontSize: 22, color: colors.textPrimary, ...font.bold },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   instRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

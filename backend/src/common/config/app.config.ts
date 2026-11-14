@@ -6,12 +6,12 @@ const DEFAULT_CORS_ORIGINS = [
   'https://rupayaidwebappp.vercel.app',
 ];
 
-export function parseCorsOrigins(raw?: string): string[] {
+export function parseCorsOrigins(raw?: string, production = process.env.NODE_ENV === 'production'): string[] {
   const fromEnv = (raw || '')
     .split(',')
     .map((value) => value.trim().replace(/\/$/, ''))
     .filter(Boolean);
-  return [...new Set([...fromEnv, ...DEFAULT_CORS_ORIGINS])];
+  return [...new Set(production ? fromEnv : [...fromEnv, ...DEFAULT_CORS_ORIGINS])];
 }
 
 export default registerAs('app', () => ({

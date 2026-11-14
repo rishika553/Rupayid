@@ -1,3 +1,4 @@
+import { SendNotificationDto, CreateNotificationTemplateDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
@@ -46,16 +47,7 @@ export class NotificationsController {
   @Post('send')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Send a notification' })
-  async send(@Body() data: {
-    userId?: string;
-    templateSlug?: string;
-    type: string;
-    title: string;
-    body: string;
-    channel?: string;
-    data?: Record<string, unknown>;
-    referenceId?: string;
-  }) {
+  async send(@Body() data: SendNotificationDto) {
     return this.notificationsService.send(data);
   }
 
@@ -69,13 +61,7 @@ export class NotificationsController {
   @Post('templates')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Create or update notification template' })
-  async createTemplate(@Body() data: {
-    slug: string;
-    channel: string;
-    titleTemplate: string;
-    bodyTemplate: string;
-    subjectTemplate?: string;
-  }) {
+  async createTemplate(@Body() data: CreateNotificationTemplateDto) {
     return this.notificationsService.createTemplate(data);
   }
 }

@@ -1,0 +1,8 @@
+# TODO_CREDENTIALS: depends on 02-login-success; enable together.
+appId: com.rupayaid.app
+---
+- runFlow: 02-login-success.yaml
+- tapOn:
+    text: "KYC"
+- assertVisible:
+    text: "Personal details"

@@ -1,3 +1,4 @@
+import { UpsertSettingDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SystemConfigService } from './config.service';
@@ -34,7 +35,7 @@ export class SystemConfigController {
   @ApiOperation({ summary: 'Create or update system setting' })
   async upsert(
     @Param('key') key: string,
-    @Body() data: { value: unknown; type?: string; description?: string; scope?: string },
+    @Body() data: UpsertSettingDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.configService.upsert(key, { ...data, updatedById: user.id });

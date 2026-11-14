@@ -44,10 +44,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.brand}>RupayAid</Text>
           <Text style={styles.title}>Sign in to your account</Text>
@@ -106,7 +103,11 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <GoogleSignInButton disabled={loading} onError={setError} onBusyChange={setGoogleLoading} />
+          <GoogleSignInButton
+            disabled={loading}
+            onError={setError}
+            onBusyChange={setGoogleLoading}
+          />
 
           <Link href="/(auth)/register" asChild>
             <TouchableOpacity style={styles.secondaryButton}>
@@ -120,13 +121,13 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F5F8FD' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   header: { marginBottom: 32, alignItems: 'center' },
   brand: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0284C7',
+    color: '#0866D9',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
@@ -152,14 +153,14 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCE8F7',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    color: '#111827',
+    color: '#172554',
   },
   button: {
-    backgroundColor: '#0284C7',
+    backgroundColor: '#0866D9',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
@@ -168,17 +169,17 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   linkWrap: { alignItems: 'center', marginTop: 12 },
-  link: { color: '#0284C7', fontSize: 14 },
+  link: { color: '#0866D9', fontSize: 14 },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 20,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#DCE8F7' },
   dividerText: { marginHorizontal: 12, color: '#94A3B8', fontSize: 14 },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCE8F7',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',

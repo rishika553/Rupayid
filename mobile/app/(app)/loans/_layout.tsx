@@ -1,14 +1,26 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { AppHeader } from '@/ui/premium';
 import { colors } from '@/ui/theme';
-
-export default function LoansLayout() {
+export default function Layout() {
+  const router = useRouter();
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.bg },
-        headerTitleStyle: { fontWeight: '600', color: colors.textPrimary },
-        headerTintColor: colors.primary,
+        contentStyle: { backgroundColor: colors.bg },
+        header: ({ options, back }) => (
+          <AppHeader
+            title={options.title}
+            onBack={back ? () => router.back() : undefined}
+            onProfile={() => router.push('/(app)/profile')}
+          />
+        ),
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ title: 'Loans' }} />
+      <Stack.Screen name="applications" options={{ title: 'Your applications' }} />
+      <Stack.Screen name="[id]" options={{ title: 'Loan details' }} />
+      <Stack.Screen name="apply/index" options={{ title: 'Apply for a loan' }} />
+      <Stack.Screen name="apply/[productId]" options={{ title: 'Loan application' }} />
+    </Stack>
   );
 }

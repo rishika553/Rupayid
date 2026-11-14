@@ -11,7 +11,10 @@
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix"
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
@@ -49,9 +52,13 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@rupayaid/config": "workspace:*",
+    "@testing-library/react-native": "^14",
+    "@types/jest": "^30",
     "@types/react": "^19.1.1",
     "babel-plugin-module-resolver": "^5.0.3",
     "eslint": "^8.56.0",
+    "jest": "^30",
+    "jest-expo": "^58",
     "typescript": "^5.3.3"
   }
 }

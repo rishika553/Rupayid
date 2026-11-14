@@ -49,8 +49,8 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.brand}>RupayAid</Text>
           <Text style={styles.successTitle}>Check your email</Text>
           <Text style={styles.successBody}>
-            If an account exists for {email.trim()}, we sent a password reset
-            link. Please check your inbox and spam folder.
+            If an account exists for {email.trim()}, we sent a password reset link. Please check
+            your inbox and spam folder.
           </Text>
           <Link href="/(auth)/login" asChild>
             <TouchableOpacity style={styles.button}>
@@ -67,16 +67,12 @@ export default function ForgotPasswordScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.brand}>RupayAid</Text>
           <Text style={styles.title}>Reset your password</Text>
           <Text style={styles.subtitle}>
-            Enter the email address associated with your account and we will send
-            a reset link.
+            Enter the email address associated with your account and we will send a reset link.
           </Text>
         </View>
 
@@ -121,7 +117,7 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F5F8FD' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   centeredContent: {
     flex: 1,
@@ -133,7 +129,7 @@ const styles = StyleSheet.create({
   brand: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0284C7',
+    color: '#0866D9',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
@@ -180,14 +176,14 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCE8F7',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    color: '#111827',
+    color: '#172554',
   },
   button: {
-    backgroundColor: '#0284C7',
+    backgroundColor: '#0866D9',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
@@ -196,5 +192,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   linkWrap: { alignItems: 'center', marginTop: 12 },
-  link: { color: '#0284C7', fontSize: 14 },
+  link: { color: '#0866D9', fontSize: 14 },
 });

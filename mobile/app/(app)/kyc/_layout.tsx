@@ -1,17 +1,25 @@
-import { Stack } from 'expo-router';
-
-export default function KycLayout() {
+import { Stack, useRouter } from 'expo-router';
+import { AppHeader } from '@/ui/premium';
+import { colors } from '@/ui/theme';
+export default function Layout() {
+  const router = useRouter();
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#F8FAFC' },
-        headerTitleStyle: { fontWeight: '600', color: '#111827' },
+        contentStyle: { backgroundColor: colors.bg },
+        header: ({ options, back }) => (
+          <AppHeader
+            title={options.title}
+            onBack={back ? () => router.back() : undefined}
+            onProfile={() => router.push('/(app)/profile')}
+          />
+        ),
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'KYC' }} />
-      <Stack.Screen name="documents" options={{ title: 'Documents' }} />
-      <Stack.Screen name="review" options={{ title: 'Review & Submit' }} />
-      <Stack.Screen name="status" options={{ title: 'KYC Status' }} />
+      <Stack.Screen name="index" options={{ title: 'KYC Verification' }} />
+      <Stack.Screen name="documents" options={{ title: 'Your documents' }} />
+      <Stack.Screen name="review" options={{ title: 'Review & submit' }} />
+      <Stack.Screen name="status" options={{ title: 'Verification status' }} />
     </Stack>
   );
 }

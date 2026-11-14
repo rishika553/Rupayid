@@ -17,6 +17,7 @@ interface AuthContextValue {
   user: CustomerUser | null;
   isReady: boolean;
   isAuthenticated: boolean;
+  sessionUnavailable: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   createAccount: (input: {
     firstName: string;
@@ -36,29 +37,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [user, setUser] = useState<CustomerUser | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [sessionUnavailable, setSessionUnavailable] = useState(false);
 
   const applySession = useCallback((data: AuthTokens, message: string) => {
     writeAuth({ accessToken: data.accessToken, refreshToken: data.refreshToken });
     apiClient.setTokens(data);
     setUser(data.user);
+    setSessionUnavailable(false);
     toast({ title: message, description: 'Welcome to RupayAid.' });
   }, [toast]);
 
   const refreshUser = useCallback(async () => {
     const tokens = readAuth();
     if (!tokens) {
+      setSessionUnavailable(false);
       setUser(null);
       apiClient.setTokens(null);
       return;
     }
     apiClient.setTokens(tokens);
-    try {
-      const me = await requireApi(apiClient.get<CustomerUser>('/auth/me'));
-      setUser(me);
-    } catch {
+    const response = await apiClient.get<CustomerUser>('/auth/me');
+    if (response.success && response.data) {
+      setSessionUnavailable(false);
+      setUser(response.data);
+    } else if (response.status === 401 || response.status === 403) {
+      setSessionUnavailable(false);
       clearAuth();
       apiClient.setTokens(null);
       setUser(null);
+    } else {
+      setSessionUnavailable(true);
     }
   }, []);
 
@@ -118,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuth();
     apiClient.setTokens(null);
     setUser(null);
+    setSessionUnavailable(false);
     toast({ title: 'Signed out' });
   }, [toast]);
 
@@ -126,13 +135,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
+      sessionUnavailable,
       signIn,
       createAccount,
       signInWithGoogle,
       logout,
       refreshUser,
     }),
-    [user, isReady, signIn, createAccount, signInWithGoogle, logout, refreshUser],
+    [user, isReady, sessionUnavailable, signIn, createAccount, signInWithGoogle, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

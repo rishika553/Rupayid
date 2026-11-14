@@ -148,7 +148,12 @@ export function KycDocumentsPanel({
           </KycField>
           {previewKind === 'image' && previewUrl ? (
             <div className="sm:col-span-2 overflow-hidden rounded-lg border bg-muted/40">
-              {/* Local object URL only — never a public storage URL */}
+              {/*
+                Intentional <img>: `previewUrl` is a local `blob:` object URL
+                from the user-picked file. next/image cannot optimise blob URLs
+                and the preview must never leave the browser.
+              */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewUrl} alt="Selected document preview" className="max-h-56 w-full object-contain" />
             </div>
           ) : null}
@@ -190,6 +195,15 @@ export function KycDocumentsPanel({
               </div>
               {remotePreview?.id === doc.id && remotePreview.image ? (
                 <div className="w-full overflow-hidden rounded-lg border bg-muted/40">
+                  {/*
+                    Intentional <img>: `remotePreview.url` is a short-lived
+                    SIGNED Cloudflare R2 URL for a private KYC document.
+                    Routing it through next/image would proxy it via
+                    `/_next/image?url=…` on Vercel, which caches responses
+                    behind a public, non-expiring path — leaking private docs.
+                    Do not change without a privacy review.
+                  */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={remotePreview.url} alt={`${statusLabel(doc.documentType)} preview`} className="max-h-56 w-full object-contain" />
                 </div>
               ) : null}

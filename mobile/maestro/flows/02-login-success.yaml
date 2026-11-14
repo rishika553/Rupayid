@@ -1,0 +1,20 @@
+# TODO_CREDENTIALS: a dedicated mobile-QA customer account is not yet seeded.
+# Once provisioned, store MAESTRO_TEST_EMAIL / MAESTRO_TEST_PASSWORD in the CI
+# secret store and populate the two tapOn / inputText blocks below.
+appId: com.rupayaid.app
+env:
+  EMAIL: ${MAESTRO_TEST_EMAIL}
+  PASSWORD: ${MAESTRO_TEST_PASSWORD}
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "password"
+- inputText: ${PASSWORD}
+- tapOn:
+    text: "Sign in"
+- assertVisible:
+    text: "Dashboard"

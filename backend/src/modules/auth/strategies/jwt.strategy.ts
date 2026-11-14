@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       aud?: string;
     },
   ) {
-    if (payload.typ === 'refresh' || payload.typ === 'admin' || payload.aud === 'admin') {
+    if (payload.typ !== 'access' || !payload.sid || !payload.sub || payload.aud === 'admin') {
       throw new UnauthorizedException('Authentication required');
     }
 

@@ -1,3 +1,4 @@
+import { CreateLedgerEntryDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { LedgerService } from './ledger.service';
@@ -25,16 +26,7 @@ export class LedgerController {
 
   @Post('entries')
   @ApiOperation({ summary: 'Create a ledger entry (append-only)' })
-  async createEntry(@Body() data: {
-    ledgerId: string;
-    entryType: string;
-    amount: number;
-    category: string;
-    description?: string;
-    reference?: string;
-    entrySource?: string;
-    direction?: string;
-  }) {
+  async createEntry(@Body() data: CreateLedgerEntryDto) {
     return this.ledgerService.createEntry(data);
   }
 

@@ -1,3 +1,4 @@
+import { CreateAdminPaymentDto, UpdatePaymentDto, CreateTransactionDto } from '../../common/dto/admin-mutations.dto';
 import { Body, Controller, Get, Headers, Param, Post, Patch, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -73,15 +74,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Initiate a payment (admin)' })
   async create(
     @CurrentUser() user: CurrentUserPayload,
-    @Body() data: {
-      loanApplicationId?: string;
-      method: string;
-      type: string;
-      direction: string;
-      amount: number;
-      gateway?: string;
-      metadata?: Record<string, unknown>;
-    },
+    @Body() data: CreateAdminPaymentDto,
   ) {
     return this.paymentsService.create({
       ...data,
@@ -115,7 +108,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Update payment status' })
   async updateStatus(
     @Param('id') id: string,
-    @Body() data: { status: string; refusalReason?: string },
+    @Body() data: UpdatePaymentDto,
   ) {
     return this.paymentsService.updateStatus(id, data.status, data.refusalReason);
   }
@@ -125,7 +118,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Add transaction to payment' })
   async addTransaction(
     @Param('id') id: string,
-    @Body() data: { type: string; amount: number; direction: string; currency?: string },
+    @Body() data: CreateTransactionDto,
   ) {
     return this.paymentsService.addTransaction(id, data);
   }

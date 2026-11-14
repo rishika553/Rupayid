@@ -1,154 +1,131 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Share } from 'react-native';
+﻿import { useRef, useState } from 'react';
+import { View, Text, StyleSheet, Share, Pressable } from 'react-native';
 import { useMyReferral } from '@/hooks/use-customer-data';
-import { requireApi } from '@/api/client';
-import { useAuth } from '@/auth/auth-context';
+import { useReferralHistory, useReferralStatistics, useSubmitReferral } from '@/hooks/use-referrals';
+import { errorMessage } from '@/lib/error-message';
 import { ScreenWrapper, Card, Button, InputField, Badge, LoadingScreen, SectionHeader } from '@/ui/components';
+import { GradientCard, ReferralIllustration } from '@/ui/premium';
 import { colors, font, spacing } from '@/ui/theme';
 
-function statusVariant(status: string) {
-  if (['CONVERTED', 'APPROVED', 'ACTIVE'].includes(status)) return 'success' as const;
-  if (['REJECTED', 'EXPIRED'].includes(status)) return 'danger' as const;
-  return 'info' as const;
-}
-
-function formatDate(d?: string | null) {
-  if (!d) return '—';
-  return d.slice(0, 10);
-}
-
 export default function ReferralScreen() {
-  const { client: apiClient } = useAuth();
-  const { data, isLoading, error, refetch } = useMyReferral();
-  const [codeInput, setCodeInput] = useState('');
-  const [checking, setChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<string | null>(null);
+  const code = useMyReferral();
+  const [page, setPage] = useState(1);
+  const history = useReferralHistory(page);
+  const stats = useReferralStatistics();
+  const submit = useSubmitReferral();
+  const busy = useRef(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [consent, setConsent] = useState(false);
+  const [message, setMessage] = useState('');
+  const [failed, setFailed] = useState(false);
 
-  if (isLoading) return <LoadingScreen />;
-
-  if (error || !data) {
-    return (
-      <ScreenWrapper>
-        <Card>
-          <Text style={s.body}>Unable to load your referral code.</Text>
-          <Button title="Retry" variant="outline" onPress={() => void refetch()} style={{ marginTop: 12 }} />
-        </Card>
-      </ScreenWrapper>
-    );
-  }
-
-  const shareUrl = data.code ? `https://rupayaid.com/login?ref=${data.code}` : '';
-
-  async function handleShare() {
-    if (!data?.code) return;
+  async function share() {
+    if (!code.data?.code) return;
     try {
-      await Share.share({
-        message: `Use my RupayAid referral code ${data.code}\n${shareUrl}`,
-      });
+      await Share.share({ message: `Join RupayAid with my referral code ${code.data.code}` });
     } catch {
-      // user cancelled
+      setFailed(true);
+      setMessage('Unable to open sharing. Please try again.');
     }
   }
 
-  async function validateCode() {
-    const trimmed = codeInput.trim().toUpperCase();
-    if (!/^RAP-[A-Za-z0-9]{8}$/i.test(trimmed)) {
-      setCheckResult('Enter a code like RAP-ABCD2345');
-      return;
+  async function send() {
+    if (busy.current) return;
+    setFailed(true);
+    const fullName = name.trim().replace(/\s+/g, ' ');
+    const mobile = phone.trim().replace(/[\s()-]/g, '');
+    if (fullName.length < 2 || fullName.length > 100 || !/^[\p{L}\p{M}][\p{L}\p{M} .'-]+$/u.test(fullName)) {
+      setMessage('Enter the referred person’s full name (2–100 characters).'); return;
     }
-    setChecking(true);
-    setCheckResult(null);
+    if (!/^(\+91)?[6-9]\d{9}$/.test(mobile)) {
+      setMessage('Enter a valid 10-digit Indian mobile number.'); return;
+    }
+    if (!consent) {
+      setMessage('Please obtain their permission and confirm consent before submitting.'); return;
+    }
+    busy.current = true;
+    setMessage('');
     try {
-      const result = await requireApi(
-        apiClient.post<{ valid: boolean; reason?: string }>('/referrals/validate', { code: trimmed }),
-      );
-      if (result.valid) {
-        setCheckResult('This referral code is valid.');
-      } else {
-        const reason = result.reason;
-        if (reason === 'self') setCheckResult('You cannot use your own referral code.');
-        else if (reason === 'limit') setCheckResult('This code cannot accept more referrals.');
-        else setCheckResult('That referral code is not valid.');
-      }
-    } catch (e: any) {
-      setCheckResult(e.message || 'Could not check that code');
-    } finally {
-      setChecking(false);
-    }
+      await submit.mutateAsync({ referredName: fullName, referredPhone: mobile, consentConfirmed: true });
+      setName(''); setPhone(''); setConsent(false); setPage(1);
+      setFailed(false); setMessage('Referral submitted successfully. You can track it below.');
+    } catch (error) {
+      setFailed(true); setMessage(errorMessage(error, 'Unable to submit referral. Please try again.'));
+    } finally { busy.current = false; }
   }
 
-  return (
-    <ScreenWrapper>
-      <SectionHeader title="Referrals" />
-      <Text style={s.subtitle}>Share your unique code when someone opens a RupayAid account.</Text>
+  if (code.isLoading) return <LoadingScreen />;
+  if (code.isError || !code.data) return <ScreenWrapper><Card>
+    <Text style={s.body}>Unable to load your referral code.</Text>
+    <Button title="Retry" onPress={() => void code.refetch()} />
+  </Card></ScreenWrapper>;
 
-      <Card>
-        <Text style={s.label}>YOUR CODE</Text>
-        <Text style={s.code} selectable>{data.code || '—'}</Text>
-        {data.code ? <Text style={s.hint}>Long-press the code to copy.</Text> : null}
-        {data.codeCreatedAt && <Text style={s.date}>Created {formatDate(data.codeCreatedAt)}</Text>}
-        <Button title="Share invite" onPress={handleShare} disabled={!data.code} style={{ marginTop: spacing.md }} />
-      </Card>
+  return <ScreenWrapper>
+    <GradientCard tone="referral">
+      <View style={s.row}>
+        <View style={{ flex: 1 }}><Text style={s.title}>Refer a friend</Text>
+          <Text style={s.body}>Help someone take their next step with RupayAid.</Text></View>
+        <ReferralIllustration />
+      </View>
+      <Text style={s.label}>YOUR REFERRAL CODE</Text>
+      <Text selectable style={s.code}>{code.data.code || 'Unavailable'}</Text>
+      <Button title="Share referral code" onPress={share} disabled={!code.data.code} />
+    </GradientCard>
 
-      <Card>
-        <Text style={s.cardTitle}>Check a referral code</Text>
-        <Text style={s.cardDesc}>Confirm a code before someone uses it at sign-in.</Text>
-        <InputField
-          label="Code"
-          value={codeInput}
-          onChangeText={setCodeInput}
-          placeholder="RAP-ABCD2345"
-          autoCapitalize="characters"
-        />
-        <Button title={checking ? 'Checking...' : 'Validate'} variant="outline" onPress={validateCode} loading={checking} />
-        {checkResult && <Text style={s.checkResult}>{checkResult}</Text>}
-      </Card>
+    {stats.data ? <View style={s.row}>
+      {([['Total', stats.data.total], ['Pending', stats.data.pending], ['Converted', stats.data.converted]] as const).map(([label, value]) =>
+        <View key={label} style={s.stat}><Text style={s.number}>{value}</Text><Text style={s.label}>{label}</Text></View>)}
+    </View> : <Card><Text style={s.body}>{stats.isError ? 'Unable to load referral counts.' : 'Loading referral counts…'}</Text>
+      {stats.isError && <Button title="Retry counts" onPress={() => void stats.refetch()} />}</Card>}
 
-      {data.referredBy && (
-        <Card>
-          <Text style={s.cardTitle}>You joined with a referral</Text>
-          <Text style={s.cardDesc}>
-            {data.referredBy.firstName} {data.referredBy.lastName} · {formatDate(data.referredBy.acceptedAt)}
-          </Text>
-          <Badge text={data.referredBy.status.replace(/_/g, ' ')} variant={statusVariant(data.referredBy.status)} />
-        </Card>
-      )}
+    <Card>
+      <SectionHeader title="Refer someone you know" />
+      <Text style={s.body}>With their permission, share their name and mobile number so RupayAid can contact them about its services. Do not submit Aadhaar or documents.</Text>
+      <InputField label="Full name" value={name} onChangeText={setName} maxLength={100} editable={!submit.isPending} autoCapitalize="words" />
+      <InputField label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={20} placeholder="10-digit Indian mobile number" editable={!submit.isPending} />
+      <Pressable accessibilityRole="checkbox" accessibilityLabel="Confirm contact consent" accessibilityState={{ checked: consent, disabled: submit.isPending }}
+        disabled={submit.isPending} onPress={() => setConsent(!consent)} style={s.consent}>
+        <Text style={s.check}>{consent ? '☑' : '☐'}</Text>
+        <Text style={[s.body, { flex: 1 }]}>I confirm this person agreed to share their name and mobile number with RupayAid and be contacted about its services.</Text>
+      </Pressable>
+      <Button title="Submit referral" onPress={send} loading={submit.isPending} />
+      {!!message && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[s.message, { color: failed ? colors.danger : colors.primary }]}>{message}</Text>}
+    </Card>
 
-      <Card>
-        <Text style={s.cardTitle}>Referral history</Text>
-        <Text style={s.cardDesc}>
-          {data.referredCount} sign-up{data.referredCount === 1 ? '' : 's'} with your code
-        </Text>
-        {data.referred.length === 0 ? (
-          <Text style={s.empty}>No one has used your code yet.</Text>
-        ) : (
-          data.referred.map((row, i) => (
-            <View key={`${row.createdAt}-${i}`} style={s.historyRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.historyName}>{row.firstName} {row.lastName}</Text>
-                <Text style={s.date}>{formatDate(row.createdAt)}</Text>
-              </View>
-              <Badge text={row.status.replace(/_/g, ' ')} variant={statusVariant(row.status)} />
-            </View>
-          ))
-        )}
-      </Card>
-    </ScreenWrapper>
-  );
+    <Card>
+      <SectionHeader title="Referral history" />
+      <Text style={s.body}>Track the people you have submitted for contact.</Text>
+      {history.isLoading && <Text style={s.body}>Loading referrals…</Text>}
+      {history.isError && <><Text style={s.body}>Unable to load referral history.</Text><Button title="Retry history" onPress={() => void history.refetch()} /></>}
+      {history.data?.data.length === 0 && <Text style={s.body}>No referrals yet.</Text>}
+      {history.data?.data.map(row => <View key={row.id} style={s.historyRow}>
+        <View style={{ flex: 1 }}><Text style={s.name}>{row.referredName}</Text>
+          <Text style={s.body}>{row.referredPhone}</Text><Text style={s.label}>{row.createdAt.slice(0, 10)}</Text></View>
+        <Badge text={row.status} variant={row.status === 'CONVERTED' ? 'success' : row.status === 'REJECTED' ? 'danger' : 'info'} />
+      </View>)}
+      {history.data && history.data.totalPages > 1 && <View style={s.row}>
+        <Button title="Previous" variant="outline" disabled={page <= 1} onPress={() => setPage(page - 1)} />
+        <Text style={s.body}>Page {page}</Text>
+        <Button title="Next" variant="outline" disabled={page >= history.data.totalPages} onPress={() => setPage(page + 1)} />
+      </View>}
+    </Card>
+    {!!code.data.referred.length && <Card><SectionHeader title="Signups using your code" />
+      {code.data.referred.map((row, index) => <Text key={`${row.createdAt}-${index}`} style={s.body}>{row.firstName} {row.lastName} · {row.status}</Text>)}
+    </Card>}
+  </ScreenWrapper>;
 }
-
 const s = StyleSheet.create({
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 },
-  body: { fontSize: 14, color: colors.textSecondary },
-  label: { fontSize: 11, color: colors.textMuted, ...font.medium, textTransform: 'uppercase', letterSpacing: 0.5 },
-  code: { fontSize: 24, color: colors.textPrimary, ...font.bold, fontFamily: 'monospace', letterSpacing: 2, marginVertical: 8 },
-  hint: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
-  date: { fontSize: 12, color: colors.textMuted },
-  buttonRow: { flexDirection: 'row', marginTop: spacing.md },
-  cardTitle: { fontSize: 16, color: colors.textPrimary, ...font.semibold, marginBottom: 4 },
-  cardDesc: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 },
-  checkResult: { fontSize: 13, color: colors.textSecondary, marginTop: 12 },
-  empty: { fontSize: 13, color: colors.textMuted },
-  historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
-  historyName: { fontSize: 14, color: colors.textPrimary, ...font.medium },
+  title: { fontSize: 26, color: colors.textPrimary, ...font.bold },
+  body: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginBottom: 10 },
+  label: { fontSize: 11, color: colors.textSecondary },
+  code: { fontSize: 24, color: colors.primary, ...font.bold, marginVertical: spacing.md, letterSpacing: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 },
+  stat: { flex: 1, backgroundColor: colors.surface, padding: 12, borderRadius: 16, alignItems: 'center' },
+  number: { fontSize: 24, color: colors.primary, ...font.bold },
+  consent: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
+  check: { fontSize: 25, color: colors.primary },
+  message: { marginTop: 12, fontSize: 14, lineHeight: 20 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderColor: colors.border, paddingVertical: 12 },
+  name: { fontSize: 15, color: colors.textPrimary, ...font.semibold },
 });

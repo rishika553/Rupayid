@@ -3,7 +3,8 @@ import { Text, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMyKyc, useCreateKyc, useSubmitKyc } from '@/hooks/use-customer-data';
 import { isKycEditable } from '@/lib/kyc';
-import { ScreenWrapper, Card, Button, Badge, LoadingScreen } from '@/ui/components';
+import { errorMessage } from '@/lib/error-message';
+import { ScreenWrapper, Card, Button, Badge, LoadingScreen, StepIndicator } from '@/ui/components';
 import { colors, font } from '@/ui/theme';
 
 export default function KycReviewScreen() {
@@ -23,8 +24,8 @@ export default function KycReviewScreen() {
   async function handleStart() {
     try {
       await createKyc.mutateAsync();
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not start KYC');
+    } catch (e) {
+      Alert.alert('Error', errorMessage(e, 'Could not start KYC'));
     }
   }
 
@@ -34,8 +35,8 @@ export default function KycReviewScreen() {
       Alert.alert('Submitted', 'Your KYC application has been submitted for review.', [
         { text: 'OK', onPress: () => router.replace('/(app)/kyc/status') },
       ]);
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not submit KYC');
+    } catch (e) {
+      Alert.alert('Error', errorMessage(e, 'Could not submit KYC'));
     }
   }
 
@@ -45,8 +46,15 @@ export default function KycReviewScreen() {
     return (
       <ScreenWrapper>
         <Card>
-          <Text style={{ fontSize: 14, color: colors.textSecondary }}>Unable to load KYC review.</Text>
-          <Button title="Retry" variant="outline" onPress={() => void refetch()} style={{ marginTop: 12 }} />
+          <Text style={{ fontSize: 14, color: colors.textSecondary }}>
+            Unable to load KYC review.
+          </Text>
+          <Button
+            title="Retry"
+            variant="outline"
+            onPress={() => void refetch()}
+            style={{ marginTop: 12 }}
+          />
         </Card>
       </ScreenWrapper>
     );
@@ -59,7 +67,9 @@ export default function KycReviewScreen() {
           <Text style={{ fontSize: 18, color: colors.textPrimary, ...font.bold, marginBottom: 8 }}>
             Start KYC Verification
           </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 16 }}>
+          <Text
+            style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 16 }}
+          >
             Complete your KYC to unlock loan products and faster disbursement.
           </Text>
           <Button title="Start KYC" onPress={handleStart} loading={createKyc.isPending} />
@@ -76,6 +86,10 @@ export default function KycReviewScreen() {
 
   return (
     <ScreenWrapper>
+      <StepIndicator
+        steps={['Personal', 'Address', 'Identity', 'Bank', 'Documents', 'Review']}
+        current={6}
+      />
       <Text style={{ fontSize: 18, color: colors.textPrimary, ...font.bold, marginBottom: 16 }}>
         Review & Submit
       </Text>
@@ -117,7 +131,16 @@ export default function KycReviewScreen() {
 
 function ReviewRow({ label, done, detail }: { label: string; done: boolean; detail?: string }) {
   return (
-    <Card style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0, padding: 12, borderWidth: 0 }}>
+    <Card
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 0,
+        padding: 12,
+        borderWidth: 0,
+      }}
+    >
       <Text style={{ fontSize: 14, color: colors.textPrimary, ...font.medium }}>{label}</Text>
       {done ? (
         <Badge text={detail || 'Done'} variant="success" />

@@ -88,6 +88,8 @@ enum KycVerificationDecision {
 
 enum ReferralStatus {
   PENDING
+  CONTACTED
+  REJECTED
   ACCEPTED
   CONVERTED // referee completed first loan or landed deposit
   EXPIRED
@@ -881,13 +883,18 @@ model KycSubmissionHistory {
 // REFERRALS
 // ============================================================================
 
-/// A customer's shareable code lives on User. This row is one referee using that code.
+/// A customer's code lives on User. Rows represent either an existing sign-up
+/// relationship or a consent-attested contact referral awaiting admin follow-up.
 model Referral {
   id           String         @id @default(uuid())
   referrerId   String
-  refereeId    String         @unique
+  refereeId    String?        @unique
   code         String
-  status       ReferralStatus @default(ACCEPTED)
+  referredName String?
+  referredPhone String?       @unique
+  consentAttestedAt DateTime?
+  consentVersion String?
+  status       ReferralStatus @default(PENDING)
   rewardAmount Decimal?       @db.Decimal(12, 2)
   paidAt       DateTime?
   metadata     Json?
@@ -895,11 +902,12 @@ model Referral {
   updatedAt    DateTime       @updatedAt
 
   referrer User  @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referee  User  @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+  referee  User? @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
 
   @@unique([referrerId, refereeId])
   @@index([referrerId, status])
   @@index([code])
+  @@index([status, createdAt])
   @@map("referrals")
 }
 

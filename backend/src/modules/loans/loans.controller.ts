@@ -1,3 +1,4 @@
+import { TransitionLoanDto, AdminLoanApproveDto, AdminLoanRejectDto } from '../../common/dto/admin-mutations.dto';
 import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -109,7 +110,7 @@ export class LoansController {
   @ApiOperation({ summary: 'Transition loan application state' })
   async transitionState(
     @Param('id') id: string,
-    @Body() data: { toState: string; reason?: string },
+    @Body() data: TransitionLoanDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.loansService.transitionState(id, data.toState, user.id, data.reason);
@@ -120,12 +121,7 @@ export class LoansController {
   @ApiOperation({ summary: 'Approve loan application' })
   async approve(
     @Param('id') id: string,
-    @Body() data: {
-      approvedAmount: number;
-      approvedTenure: number;
-      approvedInterest: number;
-      reason?: string;
-    },
+    @Body() data: AdminLoanApproveDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.loansService.approve(id, {
@@ -140,7 +136,7 @@ export class LoansController {
   @ApiOperation({ summary: 'Reject loan application' })
   async reject(
     @Param('id') id: string,
-    @Body() data: { reason: string },
+    @Body() data: AdminLoanRejectDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.loansService.reject(id, { reason: data.reason, rejectedById: user.id });

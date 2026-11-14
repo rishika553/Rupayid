@@ -47,6 +47,7 @@ export class AdminLoanApproveDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(9999999999.99)
   approvedAmount!: number;
 
   @ApiProperty()
@@ -60,6 +61,7 @@ export class AdminLoanApproveDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @Max(999.9999)
   approvedInterest!: number;
 
   @ApiPropertyOptional()

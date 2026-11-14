@@ -20,6 +20,7 @@ export default function RegisterScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,10 @@ export default function RegisterScreen() {
       setError('All fields are required.');
       return;
     }
+    if (referralCode.trim() && !/^RAP-[A-Z0-9]{8}$/i.test(referralCode.trim())) {
+      setError('Enter a valid referral code, or leave it blank.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -38,6 +43,7 @@ export default function RegisterScreen() {
         lastName: lastName.trim(),
         email: email.trim(),
         password,
+        referralCode: referralCode.trim().toUpperCase() || undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -51,10 +57,7 @@ export default function RegisterScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.brand}>RupayAid</Text>
           <Text style={styles.title}>Create your account</Text>
@@ -115,6 +118,11 @@ export default function RegisterScreen() {
             autoComplete="password-new"
           />
 
+          <Text style={styles.label}>Referral code (optional)</Text>
+          <TextInput style={styles.input} accessibilityLabel="Referral code (optional)"
+            placeholder="RAP-ABCD2345" value={referralCode} onChangeText={setReferralCode}
+            autoCapitalize="characters" autoCorrect={false} maxLength={12} />
+
           <TouchableOpacity
             style={[styles.button, (loading || googleLoading) && styles.buttonDisabled]}
             onPress={handleRegister}
@@ -128,7 +136,12 @@ export default function RegisterScreen() {
             )}
           </TouchableOpacity>
 
-          <GoogleSignInButton disabled={loading} onError={setError} onBusyChange={setGoogleLoading} />
+          <GoogleSignInButton
+            referralCode={referralCode}
+            disabled={loading}
+            onError={setError}
+            onBusyChange={setGoogleLoading}
+          />
 
           <Link href="/(auth)/login" asChild>
             <TouchableOpacity style={styles.linkWrap}>
@@ -142,13 +155,13 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F5F8FD' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   header: { marginBottom: 32, alignItems: 'center' },
   brand: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0284C7',
+    color: '#0866D9',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
@@ -176,14 +189,14 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCE8F7',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    color: '#111827',
+    color: '#172554',
   },
   button: {
-    backgroundColor: '#0284C7',
+    backgroundColor: '#0866D9',
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
@@ -192,5 +205,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   linkWrap: { alignItems: 'center', marginTop: 16 },
-  link: { color: '#0284C7', fontSize: 14 },
+  link: { color: '#0866D9', fontSize: 14 },
 });

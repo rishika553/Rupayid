@@ -39,13 +39,14 @@ yarn-error.log*
 coverage/
 .nyc_output/
 playwright-report/
+test-results/
+qa-artifacts/
 backend/.local-uploads/
 
 # Turbo
 .turbo/
 
-# Prisma
-prisma/migrations/
+# Prisma migrations are source files and must be committed.
 
 # Secrets (NEVER commit)
 *.pem

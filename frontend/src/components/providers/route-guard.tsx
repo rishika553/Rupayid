@@ -19,8 +19,8 @@ const CUSTOMER_PATHS = [
 ];
 
 export function RouteGuard({ children }: { children: ReactNode }) {
-  const { isReady: customerReady, isAuthenticated: customerAuthenticated } = useAuth();
-  const { isReady: adminReady, isAuthenticated: adminAuthenticated } = useAdminAuth();
+  const { isReady: customerReady, isAuthenticated: customerAuthenticated, sessionUnavailable: customerUnavailable, refreshUser } = useAuth();
+  const { isReady: adminReady, isAuthenticated: adminAuthenticated, sessionUnavailable: adminUnavailable, refreshAdmin } = useAdminAuth();
   const pathname = usePathname();
   const router = useRouter();
   const isCustomerPublic =
@@ -29,9 +29,10 @@ export function RouteGuard({ children }: { children: ReactNode }) {
   const isAdminApp = pathname.startsWith('/admin/');
   const isCustomerRoute = CUSTOMER_PATHS.some((route) => matchesRoute(pathname, route));
   const isReady = customerReady && adminReady;
+  const waitingForSession = (isCustomerRoute && customerUnavailable && !customerAuthenticated) || (isAdminApp && adminUnavailable && !adminAuthenticated);
 
   const redirectTarget =
-    !isReady
+    !isReady || waitingForSession
       ? null
       : !adminAuthenticated && isAdminApp
         ? '/admin'
@@ -73,6 +74,13 @@ export function RouteGuard({ children }: { children: ReactNode }) {
         <Skeleton className="h-40 w-full" />
       </div>
     );
+  }
+
+  if (waitingForSession) {
+    return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6" role="status">
+      <p>We could not check your session. Please check your connection and try again.</p>
+      <button className="rounded-md border px-4 py-2" onClick={() => void (isAdminApp ? refreshAdmin() : refreshUser())}>Try again</button>
+    </div>;
   }
 
   if (redirectTarget) {

@@ -1,0 +1,10 @@
+appId: com.rupayaid.app
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "Sign in"
+- assertVisible:
+    text: "Email"
+- assertVisible:
+    text: "Password"

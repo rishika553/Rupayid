@@ -313,7 +313,7 @@ export class KycService {
 
     const [alreadyConfirmed, documentCount] = await Promise.all([
       this.prisma.kycDocument.findFirst({
-        where: { fileStorageKey: dto.objectKey },
+        where: { fileStorageKey: { in: [dto.objectKey, this.files.finalKey(dto.objectKey)] } },
         select: { id: true },
       }),
       this.prisma.kycDocument.count({ where: { kycApplicationId: app.id } }),
@@ -339,15 +339,16 @@ export class KycService {
     }
     this.files.assertAllowedUpload(dto.mimeType, stored.sizeBytes);
 
+    const finalized = await this.files.finalizeUpload(dto.objectKey, dto.mimeType, dto.fileSizeBytes, dto.fileSha256);
     const document = await this.prisma.kycDocument.create({
       data: {
         kycApplicationId: app.id,
         documentType: dto.documentType as never,
-        fileStorageKey: dto.objectKey,
+        fileStorageKey: finalized.objectKey,
         fileUrl: null,
         mimeType: dto.mimeType,
-        fileSizeBytes: dto.fileSizeBytes,
-        fileSha256: dto.fileSha256,
+        fileSizeBytes: finalized.sizeBytes,
+        fileSha256: finalized.sha256,
         uploadedById: userId,
         status: 'UPLOADED',
       },

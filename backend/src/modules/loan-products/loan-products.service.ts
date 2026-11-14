@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { LoanProduct } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -74,6 +74,7 @@ export class LoanProductsService {
     insuranceRate?: number;
     penaltyRate?: number;
   }) {
+    assertProductTerms(data);
     return this.prisma.loanProduct.create({
       data: {
         ...data,
@@ -95,10 +96,17 @@ export class LoanProductsService {
     maxTenureMonths: number;
     baseInterestRate: number;
     processingFeeRate: number;
+    insuranceRate: number;
+    penaltyRate: number;
     isActive: boolean;
   }>) {
-    await this.findById(id);
-    return this.prisma.loanProduct.update({ where: { id }, data });
+    return this.prisma.$transaction(async (db) => {
+      await db.$queryRaw`SELECT id FROM loan_products WHERE id = ${id} FOR UPDATE`;
+      const current = await db.loanProduct.findUnique({ where: { id } });
+      if (!current) throw new NotFoundException('Loan product not found');
+      assertProductTerms({ ...current, ...data });
+      return db.loanProduct.update({ where: { id }, data });
+    });
   }
 
   isOfferedToCustomers(product: LoanProduct): boolean {
@@ -145,6 +153,25 @@ export class LoanProductsService {
   }
 }
 
+function assertProductTerms(data: {
+  minAmount: unknown; maxAmount: unknown; minTenureMonths: number; maxTenureMonths: number;
+  baseInterestRate: unknown; processingFeeRate: unknown; insuranceRate?: unknown; penaltyRate?: unknown;
+}) {
+  const min = Number(data.minAmount);
+  const max = Number(data.maxAmount);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max < min || max > 9999999999.99) {
+    throw new BadRequestException('Invalid loan amount range');
+  }
+  if (!Number.isInteger(data.minTenureMonths) || !Number.isInteger(data.maxTenureMonths) || data.minTenureMonths < 1 || data.maxTenureMonths < data.minTenureMonths || data.maxTenureMonths > 120) {
+    throw new BadRequestException('Invalid loan tenure range');
+  }
+  for (const rate of [data.baseInterestRate, data.processingFeeRate, data.insuranceRate, data.penaltyRate]) {
+    if (rate != null && (!Number.isFinite(Number(rate)) || Number(rate) < 0 || Number(rate) > 999.9999)) {
+      throw new BadRequestException('Invalid loan rate');
+    }
+  }
+}
+
 function asDecimal(value: unknown): string {
   if (value == null) {
     return '0';
@@ -180,7 +207,7 @@ function tenureOptions(min: number, max: number, rules: Record<string, unknown>)
   const span = max - min;
   const step =
     typeof rules.tenureStepMonths === 'number' && rules.tenureStepMonths > 0
-      ? Math.floor(rules.tenureStepMonths)
+      ? Math.max(1, Math.floor(rules.tenureStepMonths))
       : span > 12
         ? 6
         : 1;

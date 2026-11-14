@@ -42,24 +42,19 @@ ESLint extends the shared workspace React/TypeScript configuration. Run
 
 ## Google sign-in
 
-Both auth screens use the native Google account chooser and send its ID token to
-the existing `/auth/google` endpoint. Set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` in
-`mobile/.env` to the same Web OAuth client ID as the backend's `GOOGLE_CLIENT_ID`.
-This public client ID is not a client secret; never put a Google client secret in
-an `EXPO_PUBLIC_` variable.
+The existing Expo AuthSession Google provider is loaded only when the runtime
+has ExpoApplication and the platform OAuth client is configured. This prevents
+an unavailable optional native module from crashing email login and registration
+in Expo Go. The fallback button explains why Google login is unavailable.
+Supported, configured builds still send the provider ID token to /auth/google.
+Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID and the platform-specific Android/iOS
+client ID for the build being tested. Real Google OAuth requires device testing.
 
-Google sign-in needs an installed native build, not Expo Go. In Google Cloud,
-register an Android OAuth client for `com.rupayaid.app` and the SHA-1 certificate
-of the debug/release build being tested, in the same project as the Web client.
-Android links the native library automatically; Firebase is not used. Build with
-`pnpm --filter @rupayaid/mobile android` after configuring the Android SDK.
-For iOS, also set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`; `app.config.js` adds its
-reversed URL scheme through the library's config plugin. Rebuild after changes.
+Run the provider-availability regressions with:
+`node --test mobile/test/google-sign-in.test.cjs` from the repository root.
 
-The button remains visible in Expo Go and explains that this preview requires
-email sign-in. Cancelled Google prompts do not create a session. Native login
-with real Google credentials still needs verification on a configured build.
-Run `node --test mobile/test/google-sign-in.test.cjs` for the mocked SDK regressions.
+See [REDESIGN.md](./REDESIGN.md) for the premium UI implementation, validation
+results, Android screenshots, and remaining production verification.
 
 Live API regression probe: `node backend/test/auth-runtime.cjs` from the repo
 root. It creates one synthetic account, checks authentication and revocation,

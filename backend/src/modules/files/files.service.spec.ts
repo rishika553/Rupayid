@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { FilesService } from './files.service';
+import { Readable } from 'stream';
 
 function service() {
   return new FilesService({
@@ -8,6 +9,20 @@ function service() {
 }
 
 describe('FilesService', () => {
+  it('preserves the original local document when an upload URL is reused', async () => {
+    const files = service();
+    const upload = await files.getSignedUploadUrl({
+      userId: 'qa-user', applicationId: 'qa-application', mimeType: 'application/pdf', fileSizeBytes: 3,
+    });
+    const token = new URL(upload.uploadUrl).searchParams.get('token')!;
+    try {
+      await files.saveLocalUpload(token, 'application/pdf', Readable.from(Buffer.from('pdf')));
+      await expect(files.saveLocalUpload(token, 'application/pdf', Readable.from(Buffer.from('new')))).rejects.toThrow();
+      await expect(files.statObject(upload.objectKey)).resolves.toMatchObject({ sizeBytes: 3 });
+    } finally {
+      await files.deleteFile(upload.objectKey);
+    }
+  });
   it('rejects unsupported MIME types', () => {
     expect(() => service().assertAllowedUpload('application/zip', 100)).toThrow(BadRequestException);
   });

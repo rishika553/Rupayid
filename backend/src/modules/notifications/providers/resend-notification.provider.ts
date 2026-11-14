@@ -1,3 +1,4 @@
+import { boundedFetch } from '../../../common/http/bounded-fetch';
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
@@ -18,11 +19,12 @@ export class ResendNotificationProvider implements NotificationProvider {
     if (!apiKey || !from) {
       throw new ServiceUnavailableException('Resend is not configured');
     }
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await boundedFetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from,
@@ -31,7 +33,7 @@ export class ResendNotificationProvider implements NotificationProvider {
         text: input.body,
       }),
     });
-    const body = (await response.json().catch(() => ({}))) as {
+    const body = (await response.json().catch((error) => { if (error instanceof SyntaxError) return {}; throw error; })) as {
       id?: string;
       message?: string;
     };

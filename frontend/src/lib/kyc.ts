@@ -143,6 +143,9 @@ export function putFileWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
+    xhr.timeout = 60_000;
+    xhr.ontimeout = () => reject(new Error('Upload timed out. Please try again.'));
+    xhr.onabort = () => reject(new Error('Upload cancelled'));
     xhr.setRequestHeader('Content-Type', contentType);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {

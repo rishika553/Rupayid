@@ -1,3 +1,4 @@
+import { boundedFetch } from '../../../common/http/bounded-fetch';
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -24,7 +25,7 @@ export class RazorpayProvider implements PaymentProvider {
     const keySecret = this.require('RAZORPAY_KEY_SECRET');
     const amountMinor = toPaise(input.amount);
 
-    const response = await fetch(`${API_BASE}/orders`, {
+    const response = await boundedFetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
@@ -39,7 +40,7 @@ export class RazorpayProvider implements PaymentProvider {
       }),
     });
 
-    const payload = (await response.json().catch(() => ({}))) as {
+    const payload = (await response.json().catch((error) => { if (error instanceof SyntaxError) return {}; throw error; })) as {
       id?: string;
       error?: { description?: string };
     };
@@ -98,10 +99,10 @@ export class RazorpayProvider implements PaymentProvider {
   async fetchPayment(providerPaymentId: string): Promise<ProviderPaymentStatus> {
     const keyId = this.require('RAZORPAY_KEY_ID');
     const keySecret = this.require('RAZORPAY_KEY_SECRET');
-    const response = await fetch(`${API_BASE}/payments/${encodeURIComponent(providerPaymentId)}`, {
+    const response = await boundedFetch(`${API_BASE}/payments/${encodeURIComponent(providerPaymentId)}`, {
       headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}` },
     });
-    const payment = (await response.json().catch(() => ({}))) as RazorpayPaymentEntity & {
+    const payment = (await response.json().catch((error) => { if (error instanceof SyntaxError) return {}; throw error; })) as RazorpayPaymentEntity & {
       status?: string;
       error?: { description?: string };
     };

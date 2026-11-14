@@ -1,3 +1,4 @@
+import { ProviderTransportError } from '../../common/http/bounded-fetch';
 import {
   Inject,
   Injectable,
@@ -118,7 +119,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
         user: { select: { email: true, phoneNumber: true } },
       },
     });
-    if (!raw || ['DELIVERED', 'SENT', 'CANCELLED'].includes(raw.status)) {
+    if (!raw || ['DELIVERED', 'SENT', 'CANCELLED', 'FAILED'].includes(raw.status)) {
       return;
     }
     const notification = raw as typeof raw & {
@@ -165,6 +166,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
           throw new Error(`No ${channel.toLowerCase()} destination for notification`);
         }
         const result = await provider.send({
+          idempotencyKey: `notification/${notification.id}`,
           to: destination,
           subject: notification.title || 'RupayAid update',
           body: stringValue(data.workerBody) || notification.body || '',
@@ -197,7 +199,8 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
         }),
       ]);
     } catch (error) {
-      const exhausted = attemptNumber >= MAX_ATTEMPTS;
+      const ambiguous = error instanceof ProviderTransportError;
+      const exhausted = ambiguous || attemptNumber >= MAX_ATTEMPTS;
       const now = new Date();
       await this.prisma.$transaction([
         this.prisma.notification.update({
@@ -219,7 +222,8 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
           },
         }),
       ]);
-      throw error;
+      // Ambiguous sends require reconciliation, never blind retry.
+      if (!ambiguous) throw error;
     }
   }
 

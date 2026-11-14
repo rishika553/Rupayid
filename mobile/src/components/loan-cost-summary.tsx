@@ -1,13 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, font, radius, spacing } from '@/ui/theme';
-import {
-  formatFeeRate,
-  formatInr,
-  formatPercent,
-  productInterestRate,
-  productProcessingFeeRate,
-} from '@/lib/format';
-import { indicativeMonthly } from '@/lib/loan-apply';
+import { formatFeeRate, formatInr, productProcessingFeeRate } from '@/lib/format';
 import type { LoanApplication, LoanProduct } from '@/types';
 
 interface Props {
@@ -28,8 +21,6 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function LoanCostSummary({ product, application, amount, tenureMonths }: Props) {
   const breakdown = application?.costBreakdown;
-  const monthly = indicativeMonthly(application);
-  const rate = application?.interestRate ?? (product ? productInterestRate(product) : null);
   const fee = breakdown?.processingFee ?? application?.processingFee;
   const amt = breakdown?.amount ?? application?.amountRequested ?? amount;
   const tenure = breakdown?.tenureMonths ?? application?.tenureMonths ?? tenureMonths;
@@ -38,7 +29,6 @@ export function LoanCostSummary({ product, application, amount, tenureMonths }: 
     <View style={styles.card}>
       <Row label="Loan amount" value={formatInr(amt)} />
       <Row label="Tenure" value={`${tenure ?? '—'} months`} />
-      <Row label="Interest" value={rate != null ? formatPercent(rate) : '—'} />
       <Row
         label="Fees"
         value={
@@ -50,16 +40,11 @@ export function LoanCostSummary({ product, application, amount, tenureMonths }: 
         }
       />
       <Row
-        label="Estimated interest"
-        value={breakdown?.estimatedInterest ? formatInr(breakdown.estimatedInterest) : 'Saved after quote'}
+        label="Total payable"
+        value={breakdown?.totalPayable ? formatInr(breakdown.totalPayable) : '—'}
       />
-      <Row label="Total payable" value={breakdown?.totalPayable ? formatInr(breakdown.totalPayable) : '—'} />
-      <View style={[styles.row, styles.highlight]}>
-        <Text style={styles.highlightLabel}>Estimated monthly</Text>
-        <Text style={styles.highlightValue}>{monthly != null ? `${formatInr(monthly)}/mo` : 'After quote'}</Text>
-      </View>
       <Text style={styles.footnote}>
-        Amounts and fees come from the loan service. Monthly repayment is indicative.
+        Amounts and fees are provided by RupayAid. Final terms are subject to approval.
       </Text>
     </View>
   );
@@ -72,7 +57,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: 2,
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
   label: { fontSize: 13, color: colors.textSecondary },
   value: { fontSize: 13, color: colors.textPrimary, ...font.medium },
   highlight: { marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderColor: colors.border },

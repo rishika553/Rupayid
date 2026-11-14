@@ -7,6 +7,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   Banknote,
+  Gift,
   CalendarClock,
   ChevronDown,
   Landmark,
@@ -26,6 +27,7 @@ import { useAdminAuth } from '@/components/providers/admin-auth-provider';
 const OVERVIEW_NAV: NavItem[] = [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
 const OPERATIONS_NAV: NavItem[] = [
+  { href: '/admin/referrals', label: 'Referrals', icon: Gift },
   { href: '/admin/kyc', label: 'KYC Review', icon: ShieldCheck },
   { href: '/admin/loans', label: 'Loans', icon: Landmark },
   { href: '/admin/disbursements', label: 'Disbursements', icon: Banknote },

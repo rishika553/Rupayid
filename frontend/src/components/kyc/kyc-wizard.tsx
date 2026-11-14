@@ -97,7 +97,7 @@ export function KycWizard({
       ],
       ['Documents', String(documents.length)],
     ],
-    [application.contact?.phoneNumber, documents.length, values],
+    [documents.length, values],
   );
 
   async function persistDraft() {

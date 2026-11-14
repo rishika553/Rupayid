@@ -23,14 +23,13 @@ import {
   ErrorState,
 } from '@/ui/components';
 import { colors, font, spacing, radius } from '@/ui/theme';
-import { applyFormSchema, APPLY_STEPS, tenureChoices, type ApplyFormValues } from '@/lib/loan-apply';
 import {
-  formatInr,
-  formatPercent,
-  formatFeeRate,
-  productInterestRate,
-  productProcessingFeeRate,
-} from '@/lib/format';
+  applyFormSchema,
+  APPLY_STEPS,
+  tenureChoices,
+  type ApplyFormValues,
+} from '@/lib/loan-apply';
+import { formatInr, formatFeeRate, productProcessingFeeRate } from '@/lib/format';
 import { LoanCostSummary } from '@/components/loan-cost-summary';
 import type { EligibilityResult, LoanApplication } from '@/types';
 
@@ -63,7 +62,10 @@ export default function LoanApplyScreen() {
   });
 
   const existingDraft = useMemo(
-    () => (myLoans.data || []).find((row) => row.loanProduct?.id === productId && row.status === 'DRAFT'),
+    () =>
+      (myLoans.data || []).find(
+        (row) => row.loanProduct?.id === productId && row.status === 'DRAFT',
+      ),
     [myLoans.data, productId],
   );
 
@@ -156,7 +158,9 @@ export default function LoanApplyScreen() {
   if (!product) {
     return (
       <ScreenWrapper>
-        <Card><Text>Product not found.</Text></Card>
+        <Card>
+          <Text>Product not found.</Text>
+        </Card>
       </ScreenWrapper>
     );
   }
@@ -166,14 +170,25 @@ export default function LoanApplyScreen() {
       {step < 7 ? <StepIndicator steps={STEP_LABELS} current={step} /> : null}
 
       <Card>
-        <SectionHeader title={product.name} subtitle={product.description || 'Personal loan terms published by RupayAid.'} />
+        <SectionHeader
+          title={product.name}
+          subtitle={product.description || 'Personal loan terms published by RupayAid.'}
+        />
 
         {step === 1 ? (
           <View style={{ gap: 8 }}>
-            <SummaryRow label="Amount" value={`${formatInr(product.minAmount)} – ${formatInr(product.maxAmount)}`} />
-            <SummaryRow label="Tenure" value={`${product.minTenureMonths}–${product.maxTenureMonths} months`} />
-            <SummaryRow label="Interest" value={formatPercent(productInterestRate(product))} />
-            <SummaryRow label="Processing fee" value={formatFeeRate(productProcessingFeeRate(product))} />
+            <SummaryRow
+              label="Amount"
+              value={`${formatInr(product.minAmount)} – ${formatInr(product.maxAmount)}`}
+            />
+            <SummaryRow
+              label="Tenure"
+              value={`${product.minTenureMonths}–${product.maxTenureMonths} months`}
+            />
+            <SummaryRow
+              label="Processing fee"
+              value={formatFeeRate(productProcessingFeeRate(product))}
+            />
             {existingDraft ? (
               <View style={{ marginTop: spacing.sm }}>
                 <Badge text="Resuming existing draft" variant="info" />
@@ -186,7 +201,11 @@ export default function LoanApplyScreen() {
           <InputField
             label={`Loan amount (${formatInr(product.minAmount)} – ${formatInr(product.maxAmount)})`}
             value={amount != null ? String(amount) : ''}
-            onChangeText={(t) => form.setValue('amountRequested', Number(t.replace(/\D/g, '')) || 0, { shouldValidate: false })}
+            onChangeText={(t) =>
+              form.setValue('amountRequested', Number(t.replace(/\D/g, '')) || 0, {
+                shouldValidate: false,
+              })
+            }
             keyboardType="number-pad"
             error={form.formState.errors.amountRequested?.message}
             placeholder="e.g. 50000"
@@ -206,7 +225,9 @@ export default function LoanApplyScreen() {
                     style={[styles.tenureChip, active && styles.tenureChipActive]}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.tenureText, active && styles.tenureTextActive]}>{months} mo</Text>
+                    <Text style={[styles.tenureText, active && styles.tenureTextActive]}>
+                      {months} mo
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -221,7 +242,12 @@ export default function LoanApplyScreen() {
           saveDraft.isPending || updateDraft.isPending ? (
             <Text style={styles.helper}>Saving your draft so RupayAid can quote costs…</Text>
           ) : (
-            <LoanCostSummary product={product} application={draft} amount={amount} tenureMonths={tenure} />
+            <LoanCostSummary
+              product={product}
+              application={draft}
+              amount={amount}
+              tenureMonths={tenure}
+            />
           )
         ) : null}
 
@@ -233,10 +259,17 @@ export default function LoanApplyScreen() {
               <ErrorState message={eligibilityError} onRetry={() => void goNext()} />
             ) : eligibility ? (
               <View style={{ gap: spacing.sm }}>
-                <Badge text={eligibility.eligible ? 'Eligible' : 'Not eligible'} variant={eligibility.eligible ? 'success' : 'danger'} />
-                {eligibility.reason ? <Text style={styles.helper}>{eligibility.reason}</Text> : null}
+                <Badge
+                  text={eligibility.eligible ? 'Eligible' : 'Not eligible'}
+                  variant={eligibility.eligible ? 'success' : 'danger'}
+                />
+                {eligibility.reason ? (
+                  <Text style={styles.helper}>{eligibility.reason}</Text>
+                ) : null}
                 {eligibility.eligibleAmount ? (
-                  <Text style={styles.helper}>Approved up to {formatInr(eligibility.eligibleAmount)}</Text>
+                  <Text style={styles.helper}>
+                    Approved up to {formatInr(eligibility.eligibleAmount)}
+                  </Text>
                 ) : null}
               </View>
             ) : null}
@@ -245,11 +278,21 @@ export default function LoanApplyScreen() {
 
         {step === 6 ? (
           <View style={{ gap: spacing.md }}>
-            <LoanCostSummary product={product} application={draft} amount={amount} tenureMonths={tenure} />
+            <LoanCostSummary
+              product={product}
+              application={draft}
+              amount={amount}
+              tenureMonths={tenure}
+            />
             {eligibility ? (
               <View style={{ gap: 6 }}>
-                <Badge text={eligibility.eligible ? 'Eligible' : 'Not eligible'} variant={eligibility.eligible ? 'success' : 'danger'} />
-                {eligibility.reason ? <Text style={styles.helper}>{eligibility.reason}</Text> : null}
+                <Badge
+                  text={eligibility.eligible ? 'Eligible' : 'Not eligible'}
+                  variant={eligibility.eligible ? 'success' : 'danger'}
+                />
+                {eligibility.reason ? (
+                  <Text style={styles.helper}>{eligibility.reason}</Text>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -263,7 +306,9 @@ export default function LoanApplyScreen() {
                 Reference <Text style={styles.mono}>{draft.applicationNumber}</Text>
               </Text>
             ) : null}
-            <Text style={styles.helper}>Track review, decision, and disbursement from your application page.</Text>
+            <Text style={styles.helper}>
+              Track review, decision, and disbursement from your application page.
+            </Text>
           </View>
         ) : null}
       </Card>
@@ -325,11 +370,22 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
   rowLabel: { fontSize: 13, color: colors.textSecondary },
   rowValue: { fontSize: 13, color: colors.textPrimary, ...font.medium },
-  sectionLabel: { fontSize: 13, color: colors.textSecondary, ...font.medium, marginBottom: spacing.sm },
+  sectionLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    ...font.medium,
+    marginBottom: spacing.sm,
+  },
   tenureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tenureChip: {
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, minWidth: 72, alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minWidth: 72,
+    alignItems: 'center',
   },
   tenureChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   tenureText: { fontSize: 13, color: colors.textSecondary, ...font.medium },

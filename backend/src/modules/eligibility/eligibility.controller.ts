@@ -1,3 +1,4 @@
+import { CreateEligibilityRuleDto } from '../../common/dto/admin-mutations.dto';
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,7 +30,7 @@ export class EligibilityController {
   @Post('rules')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Create eligibility rule' })
-  async create(@Body() data: { name: string; key: string; ruleType: string; operator: string; value: unknown; description?: string }) {
+  async create(@Body() data: CreateEligibilityRuleDto) {
     return this.eligibilityService.create(data);
   }
 

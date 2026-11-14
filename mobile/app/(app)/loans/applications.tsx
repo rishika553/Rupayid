@@ -1,7 +1,16 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMyLoans } from '@/hooks/use-customer-data';
-import { ScreenWrapper, Card, Badge, LoadingScreen, EmptyState, SectionHeader, ErrorState, StatTile } from '@/ui/components';
+import {
+  ScreenWrapper,
+  Card,
+  Badge,
+  LoadingScreen,
+  EmptyState,
+  SectionHeader,
+  ErrorState,
+  StatTile,
+} from '@/ui/components';
 import { colors, font, spacing } from '@/ui/theme';
 import { formatInr, formatDate } from '@/lib/format';
 
@@ -36,15 +45,29 @@ export default function ApplicationsScreen() {
 
   return (
     <ScreenWrapper>
-      <SectionHeader title="Your applications" subtitle="Track every application through disbursement." />
+      <SectionHeader
+        title="Your applications"
+        subtitle="Track every application through disbursement."
+      />
       {applications.map((app) => {
-        const variant = app.status === 'APPROVED' ? 'success' as const
-          : app.status === 'REJECTED' ? 'danger' as const
-          : app.status === 'DRAFT' ? 'neutral' as const
-          : 'info' as const;
+        const variant =
+          app.status === 'APPROVED'
+            ? ('success' as const)
+            : app.status === 'REJECTED'
+              ? ('danger' as const)
+              : app.status === 'DRAFT'
+                ? ('neutral' as const)
+                : ('info' as const);
 
         return (
-          <Card key={app.id} onPress={() => router.push(`/(app)/loans/${app.id}`)}>
+          <Card
+            key={app.id}
+            onPress={() =>
+              app.status === 'DRAFT'
+                ? router.push('/(app)/loans/apply')
+                : router.push(`/(app)/loans/${app.id}`)
+            }
+          >
             <View style={s.row}>
               <View style={{ flex: 1 }}>
                 <Text style={s.appNumber}>{app.applicationNumber}</Text>
@@ -67,7 +90,12 @@ export default function ApplicationsScreen() {
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   appNumber: { fontSize: 12, color: colors.textMuted, ...font.medium },
   productName: { fontSize: 14, color: colors.textPrimary, ...font.semibold },
   amount: { fontSize: 16, color: colors.textPrimary, ...font.bold },

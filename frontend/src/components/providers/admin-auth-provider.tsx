@@ -12,6 +12,8 @@ interface AdminAuthContextValue {
   admin: AdminPublicProfile | null;
   isReady: boolean;
   isAuthenticated: boolean;
+  sessionUnavailable: boolean;
+  refreshAdmin: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -21,10 +23,12 @@ const AdminAuthContext = createContext<AdminAuthContextValue | null>(null);
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState<AdminPublicProfile | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [sessionUnavailable, setSessionUnavailable] = useState(false);
 
   const refreshAdmin = useCallback(async () => {
     const tokens = readAdminAuth();
     if (!tokens) {
+      setSessionUnavailable(false);
       setAdmin(null);
       adminApiClient.setTokens(null);
       return;
@@ -32,12 +36,18 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     adminApiClient.setTokens(tokens);
     const response = await adminApiClient.me();
     if (!response.success || !response.data) {
+      if (response.status !== 401 && response.status !== 403) {
+        setSessionUnavailable(true);
+        return;
+      }
+      setSessionUnavailable(false);
       clearAdminAuth();
       adminApiClient.setTokens(null);
       setAdmin(null);
       return;
     }
     setAdmin(response.data);
+    setSessionUnavailable(false);
   }, []);
 
   useEffect(() => {
@@ -51,6 +61,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
     persistAdminSession(response.data);
     setAdmin(response.data.admin);
+    setSessionUnavailable(false);
   }, []);
 
   const logout = useCallback(async () => {
@@ -62,6 +73,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     clearAdminAuth();
     adminApiClient.setTokens(null);
     setAdmin(null);
+    setSessionUnavailable(false);
   }, []);
 
   const value = useMemo(
@@ -69,10 +81,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       admin,
       isReady,
       isAuthenticated: Boolean(admin),
+      sessionUnavailable,
+      refreshAdmin,
       login,
       logout,
     }),
-    [admin, isReady, login, logout],
+    [admin, isReady, sessionUnavailable, refreshAdmin, login, logout],
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;

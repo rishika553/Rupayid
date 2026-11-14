@@ -1,3 +1,4 @@
+import { UpdateAdminDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Patch, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
@@ -24,7 +25,7 @@ export class AdminController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update admin profile' })
-  async update(@Param('id') id: string, @Body() data: { department?: string; level?: number }) {
+  async update(@Param('id') id: string, @Body() data: UpdateAdminDto) {
     return this.adminService.update(id, data);
   }
 }

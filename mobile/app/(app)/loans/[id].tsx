@@ -11,10 +11,20 @@ export default function LoanDetailScreen() {
   const { data: schedule } = useLoanRepaymentSchedule(loan?.id);
 
   if (isLoading) return <LoadingScreen />;
-  if (!loan) return <ScreenWrapper><Card><Text style={s.body}>Loan not found.</Text></Card></ScreenWrapper>;
+  if (!loan)
+    return (
+      <ScreenWrapper>
+        <Card>
+          <Text style={s.body}>Loan not found.</Text>
+        </Card>
+      </ScreenWrapper>
+    );
 
-  const statusVariant = ['ACTIVE', 'DISBURSED', 'APPROVED'].includes(loan.status) ? 'success' as const
-    : ['REJECTED', 'DECLINED', 'CLOSED'].includes(loan.status) ? 'danger' as const : 'info' as const;
+  const statusVariant = ['ACTIVE', 'DISBURSED', 'APPROVED'].includes(loan.status)
+    ? ('success' as const)
+    : ['REJECTED', 'DECLINED', 'CLOSED'].includes(loan.status)
+      ? ('danger' as const)
+      : ('info' as const);
 
   return (
     <ScreenWrapper>
@@ -38,12 +48,6 @@ export default function LoanDetailScreen() {
             <Text style={s.label}>Tenure</Text>
             <Text style={s.value}>{loan.tenureMonths} months</Text>
           </View>
-          {loan.interestRate != null && (
-            <View style={s.gridItem}>
-              <Text style={s.label}>Interest</Text>
-              <Text style={s.value}>{loan.interestRate}%</Text>
-            </View>
-          )}
         </View>
 
         {loan.disbursementDate && (
@@ -56,7 +60,10 @@ export default function LoanDetailScreen() {
           <Text style={s.sectionTitle}>Next Repayment</Text>
           <Text style={s.bigAmount}>₹{loan.nextRepayment.amount}</Text>
           <Text style={s.meta}>Due: {loan.nextRepayment.dueDate.slice(0, 10)}</Text>
-          <Badge text={loan.nextRepayment.status.replace(/_/g, ' ')} variant={loan.nextRepayment.status === 'OVERDUE' ? 'danger' : 'info'} />
+          <Badge
+            text={loan.nextRepayment.status.replace(/_/g, ' ')}
+            variant={loan.nextRepayment.status === 'OVERDUE' ? 'danger' : 'info'}
+          />
           <Button
             title="Pay Now"
             onPress={() => router.push('/(app)/repayments')}
@@ -68,10 +75,15 @@ export default function LoanDetailScreen() {
       {loan.costBreakdown && (
         <Card>
           <Text style={s.sectionTitle}>Cost Breakdown</Text>
-          {loan.costBreakdown.amount && <Row label="Amount" value={`₹${loan.costBreakdown.amount}`} />}
-          {loan.costBreakdown.processingFee && <Row label="Processing Fee" value={`₹${loan.costBreakdown.processingFee}`} />}
-          {loan.costBreakdown.estimatedInterest && <Row label="Est. Interest" value={`₹${loan.costBreakdown.estimatedInterest}`} />}
-          {loan.costBreakdown.totalPayable && <Row label="Total Payable" value={`₹${loan.costBreakdown.totalPayable}`} bold />}
+          {loan.costBreakdown.amount && (
+            <Row label="Amount" value={`₹${loan.costBreakdown.amount}`} />
+          )}
+          {loan.costBreakdown.processingFee && (
+            <Row label="Processing Fee" value={`₹${loan.costBreakdown.processingFee}`} />
+          )}
+          {loan.costBreakdown.totalPayable && (
+            <Row label="Total Payable" value={`₹${loan.costBreakdown.totalPayable}`} bold />
+          )}
         </Card>
       )}
 
@@ -84,7 +96,13 @@ export default function LoanDetailScreen() {
                 <Text style={s.instNum}>#{inst.installmentNumber}</Text>
                 <Badge
                   text={inst.status}
-                  variant={inst.status === 'PAID' ? 'success' : inst.status === 'OVERDUE' ? 'danger' : 'neutral'}
+                  variant={
+                    inst.status === 'PAID'
+                      ? 'success'
+                      : inst.status === 'OVERDUE'
+                        ? 'danger'
+                        : 'neutral'
+                  }
                 />
               </View>
               <View style={s.row}>
@@ -103,7 +121,9 @@ export default function LoanDetailScreen() {
             <View key={i} style={s.timelineItem}>
               <View style={s.timelineDot} />
               <View>
-                <Text style={s.timelineText}>{event.fromState} → {event.toState}</Text>
+                <Text style={s.timelineText}>
+                  {event.fromState} → {event.toState}
+                </Text>
                 <Text style={s.meta}>{event.createdAt.slice(0, 10)}</Text>
               </View>
             </View>
@@ -124,7 +144,12 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   appNum: { fontSize: 12, color: colors.textMuted, ...font.medium },
   productName: { fontSize: 16, color: colors.textPrimary, ...font.bold, marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -134,13 +159,26 @@ const s = StyleSheet.create({
   bigAmount: { fontSize: 22, color: colors.textPrimary, ...font.bold, marginBottom: 4 },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   body: { fontSize: 14, color: colors.textSecondary },
-  sectionTitle: { fontSize: 14, color: colors.textSecondary, ...font.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    ...font.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
   instNum: { fontSize: 13, color: colors.textSecondary, ...font.medium },
   instAmount: { fontSize: 15, color: colors.textPrimary, ...font.semibold },
   breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   breakdownLabel: { fontSize: 13, color: colors.textSecondary },
   breakdownValue: { fontSize: 13, color: colors.textPrimary, ...font.semibold },
   timelineItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 10 },
-  timelineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5 },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    marginTop: 5,
+  },
   timelineText: { fontSize: 13, color: colors.textPrimary, ...font.medium },
 });

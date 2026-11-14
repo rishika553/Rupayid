@@ -1,3 +1,4 @@
+import { CreateLoanProductDto, UpdateLoanProductDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { LoanProductsService } from './loan-products.service';
@@ -42,17 +43,7 @@ export class LoanProductsController {
   @ApiBearerAuth()
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Create loan product' })
-  async create(@Body() data: {
-    code: string;
-    name: string;
-    description?: string;
-    minAmount: number;
-    maxAmount: number;
-    minTenureMonths: number;
-    maxTenureMonths: number;
-    baseInterestRate: number;
-    processingFeeRate: number;
-  }) {
+  async create(@Body() data: CreateLoanProductDto) {
     return this.loanProductsService.create(data);
   }
 
@@ -60,7 +51,7 @@ export class LoanProductsController {
   @ApiBearerAuth()
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update loan product' })
-  async update(@Param('id') id: string, @Body() data: Record<string, unknown>) {
-    return this.loanProductsService.update(id, data as never);
+  async update(@Param('id') id: string, @Body() data: UpdateLoanProductDto) {
+    return this.loanProductsService.update(id, data);
   }
 }

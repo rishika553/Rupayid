@@ -303,3 +303,19 @@ describe('PaymentsService', () => {
     });
   });
 });
+
+ it('does not reissue a provider order for an existing in-flight payment', async () => {
+  const h = harness();
+  h.payments.push(payment({ status: 'INITIATED', gatewayRef: null }));
+  await h.svc.createCustomerPayment('user-1', { loanId: 'loan-1', installmentNumber: 1 });
+  expect(h.provider.createOrder).not.toHaveBeenCalled();
+ });
+ it('keeps an ambiguous provider write reserved for reconciliation', async () => {
+  const { ProviderTransportError } = await import('../../common/http/bounded-fetch');
+  const h = harness();
+  h.provider.createOrder.mockRejectedValueOnce(new ProviderTransportError());
+  await expect(h.svc.createCustomerPayment('user-1', { loanId: 'loan-1', installmentNumber: 1 })).rejects.toThrow('outcome may be unknown');
+  expect(h.payments[0].status).toBe('AWAITING_CONFIRMATION');
+  await h.svc.createCustomerPayment('user-1', { loanId: 'loan-1', installmentNumber: 1 });
+  expect(h.provider.createOrder).toHaveBeenCalledTimes(1);
+ });

@@ -17,6 +17,7 @@ function createStore() {
     { id: 'user-1', email: 'ria@example.com', status: 'ACTIVE' },
   ];
   const sessions: Array<Record<string, unknown>> = [];
+  let queue = Promise.resolve();
 
   const prisma = {
     user: {
@@ -59,7 +60,17 @@ function createStore() {
         return { count: 1 };
       },
     },
-    $transaction: async (ops: Promise<unknown>[]) => Promise.all(ops),
+    $queryRaw: jest.fn(async () => [{ id: 'user-1' }]),
+    $transaction: async (operation: (db: unknown) => Promise<unknown>) => {
+      const previous = queue;
+      let release!: () => void;
+      queue = new Promise<void>((resolve) => { release = resolve; });
+      await previous;
+      const snapshot = structuredClone(sessions);
+      try { return await operation(prisma); }
+      catch (error) { sessions.splice(0, sessions.length, ...snapshot); throw error; }
+      finally { release(); }
+    },
   };
 
   return { prisma, users, sessions };
@@ -73,6 +84,39 @@ function createService() {
 }
 
 describe('SessionService', () => {
+  it('serializes concurrent refreshes, issues at most one replacement and revokes it on replay', async () => {
+    const { service, store } = createService();
+    const first = await service.issueCustomerSession('user-1', 'ip');
+    const results = await Promise.allSettled([service.refresh(first.refreshToken, 'ip'), service.refresh(first.refreshToken, 'ip')]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(store.sessions).toHaveLength(4);
+    expect(store.sessions.every((row) => row.status === 'REVOKED')).toBe(true);
+    expect(store.prisma.$queryRaw).toHaveBeenCalled();
+  });
+
+  it('revokes descendants on ancestor replay while preserving a different login family', async () => {
+    const { service, store } = createService();
+    const first = await service.issueCustomerSession('user-1', 'ip');
+    const second = await service.refresh(first.refreshToken, 'ip');
+    const third = await service.refresh(second.refreshToken, 'ip');
+    const unrelated = await service.issueCustomerSession('user-1', 'other-ip');
+    await expect(service.refresh(first.refreshToken, 'ip')).rejects.toThrow(UnauthorizedException);
+    await expect(service.refresh(third.refreshToken, 'ip')).rejects.toThrow(UnauthorizedException);
+    await expect(service.refresh(unrelated.refreshToken, 'other-ip')).resolves.toHaveProperty('accessToken');
+    expect(store.sessions.slice(0, 6).every((row) => row.status === 'REVOKED')).toBe(true);
+  });
+
+  it('rolls back token consumption if replacement persistence fails', async () => {
+    const { service, store } = createService();
+    const first = await service.issueCustomerSession('user-1', 'ip');
+    const create = jest.spyOn(store.prisma.session, 'create').mockRejectedValueOnce(new Error('database failure'));
+    await expect(service.refresh(first.refreshToken, 'ip')).rejects.toThrow('database failure');
+    create.mockRestore();
+    expect(store.sessions).toHaveLength(2);
+    expect(store.sessions.every((row) => row.status === 'ACTIVE')).toBe(true);
+    await expect(service.refresh(first.refreshToken, 'ip')).resolves.toHaveProperty('refreshToken');
+  });
   it('issues an access and refresh session for an active customer', async () => {
     const { service, store } = createService();
     const result = await service.issueCustomerSession('user-1', '1.1.1.1');

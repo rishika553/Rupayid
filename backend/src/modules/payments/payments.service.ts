@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ProviderTransportError } from '../../common/http/bounded-fetch';
 import { createHash, randomBytes } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,6 +40,7 @@ export class PaymentsService {
       }
     }
 
+    let createdHere = false;
     const created = await this.prisma.$transaction(async (tx) => {
       const loan = await tx.loanApplication.findUnique({
         where: { id: data.loanId },
@@ -73,6 +75,7 @@ export class PaymentsService {
       }
 
       const txRef = `TXN-${randomBytes(6).toString('hex').toUpperCase()}`;
+      createdHere = true;
       return tx.payment.create({
         data: {
           userId,
@@ -96,7 +99,7 @@ export class PaymentsService {
       });
     });
 
-    if (created.gatewayRef && OPEN_PAYMENT.includes(created.status)) {
+    if (!createdHere || (created.gatewayRef && OPEN_PAYMENT.includes(created.status))) {
       return this.toCustomerView(created, { includeCheckout: true });
     }
 
@@ -137,6 +140,14 @@ export class PaymentsService {
       });
       return this.toCustomerView(pending, { includeCheckout: true, order });
     } catch (error) {
+      if (error instanceof ProviderTransportError) {
+        // Keep the installment reserved until provider reconciliation resolves the outcome.
+        await this.prisma.payment.update({
+          where: { id: created.id },
+          data: { status: 'AWAITING_CONFIRMATION', refusalReason: error.message },
+        });
+        throw error;
+      }
       await this.prisma.payment.update({
         where: { id: created.id },
         data: {

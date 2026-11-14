@@ -38,6 +38,12 @@ function service(rows: ReturnType<typeof product>[]) {
 }
 
 describe('LoanProductsService', () => {
+  it('does not loop forever for a fractional configured tenure step', () => {
+    const view = service([]).toCustomerProduct(product({
+      minTenureMonths: 6, maxTenureMonths: 8, rules: { tenureStepMonths: 0.5 },
+    }) as never);
+    expect(view.tenureOptions).toEqual([6, 7, 8]);
+  });
   it('lists only active customer-available products without admin fields', async () => {
     const svc = service([
       product(),

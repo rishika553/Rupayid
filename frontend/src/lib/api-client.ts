@@ -1,3 +1,4 @@
+import { boundedFetch } from './bounded-fetch';
 import type { ApiResponse, AuthTokens } from '@rupayaid/types';
 import { clearAuth, readAuth, writeAuth } from '@/lib/auth-storage';
 
@@ -36,16 +37,21 @@ interface RequestOptions extends Omit<RequestInit, 'method' | 'body'> {
   skipAuthRefresh?: boolean;
 }
 
-class ApiClient {
+type ApiResult<T> = ApiResponse<T> & { status?: number };
+type RefreshResult = 'refreshed' | 'invalid' | 'unavailable';
+
+export class ApiClient {
   private baseUrl: string;
   private tokens: AuthTokens | null = null;
-  private refreshInFlight: Promise<boolean> | null = null;
+  private refreshInFlight: Promise<RefreshResult> | null = null;
+  private sessionEpoch = 0;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
 
   setTokens(tokens: AuthTokens | null) {
+    this.sessionEpoch++;
     this.tokens = tokens;
   }
 
@@ -57,14 +63,15 @@ class ApiClient {
     return !SKIP_BEARER.has(endpoint);
   }
 
-  private async refreshSession(): Promise<boolean> {
+  private async refreshSession(): Promise<RefreshResult> {
     if (this.refreshInFlight) {
       return this.refreshInFlight;
     }
-    this.refreshInFlight = (async () => {
+    const epoch = this.sessionEpoch;
+    this.refreshInFlight = (async (): Promise<RefreshResult> => {
       const current = this.resolveTokens();
       if (!current?.refreshToken) {
-        return false;
+        return 'invalid';
       }
       const response = await this.request<{ accessToken: string; refreshToken: string }>(
         '/auth/refresh',
@@ -74,23 +81,26 @@ class ApiClient {
           skipAuthRefresh: true,
         },
       );
+      if (epoch !== this.sessionEpoch) return 'unavailable';
+      if (response.status === 401 || response.status === 403) return 'invalid';
       if (!response.success || !response.data?.accessToken || !response.data?.refreshToken) {
-        return false;
+        return 'unavailable';
       }
       const next = {
         accessToken: response.data.accessToken,
         refreshToken: response.data.refreshToken,
       };
       writeAuth(next);
-      this.setTokens(next);
-      return true;
+      this.tokens = next;
+      return 'refreshed';
     })().finally(() => {
       this.refreshInFlight = null;
     });
     return this.refreshInFlight;
   }
 
-  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
+    const epoch = this.sessionEpoch;
     const { method = 'GET', params, body, headers: customHeaders, skipAuthRefresh, ...rest } = options;
 
     let url = `${this.baseUrl}${endpoint}`;
@@ -109,35 +119,47 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
+      const response = await boundedFetch(url, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
         ...rest,
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch((error) => { if (error instanceof SyntaxError) return {}; throw error; });
+      if (epoch !== this.sessionEpoch) return { success: false, error: 'Session changed', status: 0 };
 
       if (response.status === 401 && !skipAuthRefresh && this.shouldSendBearer(endpoint)) {
-        const refreshed = await this.refreshSession();
-        if (refreshed) {
+        if (tokens?.accessToken && tokens.accessToken !== this.resolveTokens()?.accessToken) {
           return this.request<T>(endpoint, { ...options, skipAuthRefresh: true });
         }
+        const refreshed = await this.refreshSession();
+        if (refreshed === 'refreshed') {
+          return this.request<T>(endpoint, { ...options, skipAuthRefresh: true });
+        }
+        if (refreshed === 'unavailable') return { success: false, error: 'Authentication service temporarily unavailable. Please try again.', status: 503 };
+        clearAuth();
+        this.tokens = null;
+      }
+
+      if (response.status === 401 && skipAuthRefresh && this.shouldSendBearer(endpoint)) {
         clearAuth();
         this.tokens = null;
       }
 
       if (!response.ok) {
-        return { success: false, error: errorMessage(payload) };
+        return { success: false, error: errorMessage(payload), status: response.status };
       }
 
       return {
         success: true,
+        status: response.status,
         data: (payload as { data?: T }).data ?? payload,
       };
     } catch (error) {
       return {
         success: false,
+        status: 0,
         error: error instanceof Error ? error.message : 'Network error',
       };
     }

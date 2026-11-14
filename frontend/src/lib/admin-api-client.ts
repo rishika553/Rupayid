@@ -1,3 +1,4 @@
+import { boundedFetch } from './bounded-fetch';
 import { clearAdminAuth, readAdminAuth, writeAdminAuth } from '@/lib/admin-auth-storage';
 import type { StoredAdminAuth } from '@/lib/admin-auth-storage';
 
@@ -9,6 +10,24 @@ export interface AdminPublicProfile {
   id: string;
   username: string;
   status: string;
+}
+
+export interface AdminReferral {
+  id: string;
+  referredName: string;
+  referredPhone: string;
+  code: string;
+  status: string;
+  createdAt: string;
+  consentAttestedAt: string;
+  consentVersion: string;
+  referrer: { id: string; firstName: string; lastName: string; email: string | null };
+}
+export interface AdminReferralPage {
+  data: AdminReferral[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 export interface AdminLoginResult {
@@ -76,12 +95,12 @@ class AdminApiClient {
     }
 
     try {
-      const response = await fetch(url, {
+      const response = await boundedFetch(url, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch((error) => { if (error instanceof SyntaxError) return {}; throw error; });
 
       if (response.status === 401 && !SKIP_BEARER.has(endpoint)) {
         clearAdminAuth();
@@ -168,6 +187,18 @@ class AdminApiClient {
     if (params?.status) query.status = params.status;
     if (params?.search) query.search = params.search;
     return this.request<AdminLoanListResult>('/api/admin/loans', { params: query });
+  }
+
+  referralList(params: { page: number; status?: string; search?: string }) {
+    return this.request<AdminReferralPage>('/api/admin/referrals', {
+      params: { page: String(params.page), limit: '20', status: params.status || '', search: params.search || '' },
+    });
+  }
+
+  updateReferralStatus(id: string, status: string) {
+    return this.request<{ id: string; status: string }>(`/api/admin/referrals/${id}/status`, {
+      method: 'PATCH', body: { status },
+    });
   }
 
   loanById(id: string) {

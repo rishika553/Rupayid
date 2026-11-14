@@ -58,7 +58,7 @@ const steps = [
   ['04', 'Eligibility assessment', 'We assess your request against applicable criteria.', BarChart3],
   ['05', 'Approval & disbursement', 'Funds move to your verified bank account.', WalletCards],
   ['06', 'Repayment', 'Repay according to your agreed schedule.', HandCoins],
-]
+] as const
 
 const faqs = [
   ['What is RupayAid?', 'RupayAid is a simple, transparent way to navigate temporary financial needs with respectful human guidance and clear next steps.'],

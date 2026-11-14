@@ -1,17 +1,35 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { clientIp } from '../../common/http/client-ip';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { ValidateReferralDto } from './dto/referral.dto';
+import { ReferralListQueryDto, SubmitReferralDto, ValidateReferralDto } from './dto/referral.dto';
 import { ReferralsService } from './referrals.service';
 
 @ApiTags('referrals')
 @Controller('referrals')
 export class ReferralsController {
   constructor(private readonly referralsService: ReferralsService) {}
+
+  @Post()
+  @ApiBearerAuth()
+  submit(@CurrentUser() user: CurrentUserPayload, @Body() dto: SubmitReferralDto) {
+    return this.referralsService.submit(user.id, dto);
+  }
+
+  @Get('history')
+  @ApiBearerAuth()
+  history(@CurrentUser() user: CurrentUserPayload, @Query() query: ReferralListQueryDto) {
+    return this.referralsService.listMine(user.id, query);
+  }
+
+  @Get('statistics')
+  @ApiBearerAuth()
+  statistics(@CurrentUser() user: CurrentUserPayload) {
+    return this.referralsService.statistics(user.id);
+  }
 
   @Post('validate')
   @Public()

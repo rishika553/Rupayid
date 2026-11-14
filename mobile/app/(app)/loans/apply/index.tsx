@@ -27,14 +27,24 @@ import { colors, font, spacing } from '@/ui/theme';
 import { formatInr } from '@/lib/format';
 import type { EligibilityResult } from '@/types';
 
-const PURPOSES = ['Personal', 'Medical', 'Education', 'Home', 'Business', 'Vehicle', 'Other'] as const;
+const PURPOSES = [
+  'Personal',
+  'Medical',
+  'Education',
+  'Home',
+  'Business',
+  'Vehicle',
+  'Other',
+] as const;
 const EMPLOYMENT = ['Salaried', 'Self-employed', 'Business owner', 'Student', 'Other'] as const;
 
 const PURPOSE_OPTIONS = PURPOSES.map((p) => ({ label: p, value: p }));
 const EMPLOYMENT_OPTIONS = EMPLOYMENT.map((e) => ({ label: e, value: e }));
 
 const schema = z.object({
-  amountRequested: z.coerce.number({ invalid_type_error: 'Enter the loan amount' }).positive('Enter the loan amount'),
+  amountRequested: z.coerce
+    .number({ invalid_type_error: 'Enter the loan amount' })
+    .positive('Enter the loan amount'),
   tenureMonths: z.coerce
     .number({ invalid_type_error: 'Enter tenure in months' })
     .int('Tenure must be a whole number of months')
@@ -42,7 +52,9 @@ const schema = z.object({
     .max(60, 'Tenure cannot be more than 60 months'),
   purpose: z.string().min(1, 'Select the purpose of the loan'),
   employmentType: z.string().min(1, 'Select employment type'),
-  monthlyIncome: z.coerce.number({ invalid_type_error: 'Enter monthly income' }).min(1, 'Enter monthly income'),
+  monthlyIncome: z.coerce
+    .number({ invalid_type_error: 'Enter monthly income' })
+    .min(1, 'Enter monthly income'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -56,7 +68,8 @@ export default function LoanApplyIndexScreen() {
   const submitLoan = useSubmitLoanApplication();
   const evaluateEligibility = useEvaluateEligibility();
 
-  const products = productsQuery.data || [];
+  // Stabilise the array reference so downstream useMemo deps don't bust every render.
+  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const existingDraft = (loansQuery.data || []).find((row) => row.status === 'DRAFT');
 
   const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
@@ -132,7 +145,9 @@ export default function LoanApplyIndexScreen() {
           (error) => {
             if (!cancelled) {
               setEligibility(null);
-              setEligibilityError(error instanceof Error ? error.message : 'Could not check eligibility');
+              setEligibilityError(
+                error instanceof Error ? error.message : 'Could not check eligibility',
+              );
             }
           },
         );
@@ -153,7 +168,11 @@ export default function LoanApplyIndexScreen() {
       return;
     }
     const product = products
-      .filter((r) => values.amountRequested >= Number(r.minAmount) && values.amountRequested <= Number(r.maxAmount))
+      .filter(
+        (r) =>
+          values.amountRequested >= Number(r.minAmount) &&
+          values.amountRequested <= Number(r.maxAmount),
+      )
       .sort((a, b) => Number(b.maxAmount) - Number(a.maxAmount))[0];
     if (!product) {
       form.setError('amountRequested', {
@@ -162,7 +181,10 @@ export default function LoanApplyIndexScreen() {
       return;
     }
     if (eligibility && !eligibility.eligible) {
-      Alert.alert('Not eligible yet', eligibility.reason || 'Complete KYC and profile details, then try again.');
+      Alert.alert(
+        'Not eligible yet',
+        eligibility.reason || 'Complete KYC and profile details, then try again.',
+      );
       return;
     }
     try {
@@ -202,12 +224,16 @@ export default function LoanApplyIndexScreen() {
 
   return (
     <ScreenWrapper>
-      <SectionHeader title="Apply for a loan" subtitle="Enter the required loan details and submit your application." />
+      <SectionHeader
+        title="Apply for a loan"
+        subtitle="Enter the required loan details and submit your application."
+      />
 
       <Card>
         <Text style={styles.cardTitle}>Loan details</Text>
         <Text style={styles.cardDesc}>
-          Fill in the required details to apply. KYC must be complete before we can accept the application.
+          Fill in the required details to apply. KYC must be complete before we can accept the
+          application.
         </Text>
 
         <View style={styles.field}>
@@ -218,7 +244,11 @@ export default function LoanApplyIndexScreen() {
               <InputField
                 label="Loan amount (₹)"
                 value={field.value ? String(field.value) : ''}
-                onChangeText={(t) => field.onChange(t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number))}
+                onChangeText={(t) =>
+                  field.onChange(
+                    t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number),
+                  )
+                }
                 keyboardType="number-pad"
                 placeholder={`${limits.minAmount}`}
                 error={fieldState.error?.message}
@@ -226,7 +256,9 @@ export default function LoanApplyIndexScreen() {
             )}
           />
           {!form.formState.errors.amountRequested ? (
-            <Text style={styles.hint}>Between {formatInr(limits.minAmount)} and {formatInr(limits.maxAmount)}</Text>
+            <Text style={styles.hint}>
+              Between {formatInr(limits.minAmount)} and {formatInr(limits.maxAmount)}
+            </Text>
           ) : null}
         </View>
 
@@ -238,7 +270,11 @@ export default function LoanApplyIndexScreen() {
               <InputField
                 label="Tenure (months)"
                 value={field.value ? String(field.value) : ''}
-                onChangeText={(t) => field.onChange(t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number))}
+                onChangeText={(t) =>
+                  field.onChange(
+                    t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number),
+                  )
+                }
                 keyboardType="number-pad"
                 placeholder="e.g. 18"
                 maxLength={3}
@@ -286,7 +322,9 @@ export default function LoanApplyIndexScreen() {
             <InputField
               label="Monthly income (₹)"
               value={field.value ? String(field.value) : ''}
-              onChangeText={(t) => field.onChange(t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number))}
+              onChangeText={(t) =>
+                field.onChange(t ? Number(t.replace(/\D/g, '')) : (undefined as unknown as number))
+              }
               keyboardType="number-pad"
               error={fieldState.error?.message}
             />
@@ -305,14 +343,21 @@ export default function LoanApplyIndexScreen() {
             />
             {eligibility.reason ? <Text style={styles.hint}>{eligibility.reason}</Text> : null}
             {eligibility.eligibleAmount ? (
-              <Text style={styles.hint}>Approved up to {formatInr(eligibility.eligibleAmount)}</Text>
+              <Text style={styles.hint}>
+                Approved up to {formatInr(eligibility.eligibleAmount)}
+              </Text>
             ) : null}
           </View>
         ) : null}
       </Card>
 
       <View style={styles.footer}>
-        <Button title="Cancel" variant="outline" onPress={() => router.back()} style={{ flex: 1 }} />
+        <Button
+          title="Cancel"
+          variant="outline"
+          onPress={() => router.back()}
+          style={{ flex: 1 }}
+        />
         <Button
           title={pending ? 'Submitting…' : 'Submit application'}
           variant="cta"
@@ -328,9 +373,20 @@ export default function LoanApplyIndexScreen() {
 
 const styles = StyleSheet.create({
   cardTitle: { fontSize: 17, color: colors.textPrimary, ...font.semibold },
-  cardDesc: { fontSize: 13, color: colors.textSecondary, marginTop: 4, marginBottom: spacing.lg, lineHeight: 18 },
+  cardDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: spacing.lg,
+    lineHeight: 18,
+  },
   field: { marginBottom: spacing.sm },
-  hint: { fontSize: 12, color: colors.textSecondary, marginTop: -spacing.sm, marginBottom: spacing.md },
+  hint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
   eligibility: { gap: spacing.sm, marginTop: spacing.sm },
   footer: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
 });

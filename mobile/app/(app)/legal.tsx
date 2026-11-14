@@ -53,9 +53,7 @@ export default function LegalScreen() {
               <Text style={s.title}>{section.title}</Text>
               <Text style={s.arrow}>{expanded === section.id ? '▲' : '▼'}</Text>
             </View>
-            {expanded === section.id && (
-              <Text style={s.content}>{section.content}</Text>
-            )}
+            {expanded === section.id && <Text style={s.content}>{section.content}</Text>}
           </Card>
         </TouchableOpacity>
       ))}

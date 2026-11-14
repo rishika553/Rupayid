@@ -1,7 +1,9 @@
 'use client'
+import { boundedFetch } from '@/lib/bounded-fetch';
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -164,10 +166,13 @@ function ImageCarousel() {
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
               className="absolute inset-0"
             >
-              <img
+              <Image
                 src={stories[active].image}
                 alt={stories[active].title}
-                className="size-full object-cover"
+                fill
+                sizes="(min-width: 1024px) 60vw, 100vw"
+                priority={active === 0}
+                className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#082E61]/90 via-[#082E61]/30 to-transparent" />
               <div className="absolute inset-0 bg-gradient-to-r from-[#082E61]/40 to-transparent" />
@@ -547,7 +552,7 @@ export function LandingPage() {
     setContactStatus('sending')
     try {
       const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
-      const response = await fetch(`${base}/health/contact`, {
+      const response = await boundedFetch(`${base}/health/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -748,7 +753,13 @@ export function LandingPage() {
     <section id="lending" className="section-bg-warm px-5 py-24 sm:px-8">
       <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
         <div className="lending-visual group rounded-[2rem] p-6 transition duration-500 hover:-translate-y-2 hover:shadow-[0_30px_70px_-28px_rgba(15,76,129,.65)] sm:p-10">
-          <img src="/rupayaid-lending.png" alt="Community members planning a brighter financial future" className="absolute inset-0 size-full object-cover opacity-25 mix-blend-screen transition duration-700 group-hover:scale-105 group-hover:opacity-35" />
+          <Image
+            src="/rupayaid-lending.png"
+            alt="Community members planning a brighter financial future"
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-cover opacity-25 mix-blend-screen transition duration-700 group-hover:scale-105 group-hover:opacity-35"
+          />
           <div className="absolute inset-0 bg-primary/55" />
           <div className="relative">
             <div className="flex items-center justify-between">

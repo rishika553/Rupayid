@@ -1,3 +1,4 @@
+import { boundedFetch } from '../http/bounded-fetch';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -86,18 +87,13 @@ export async function sendDigimilesSms(options: {
   });
 
   const fetchImpl = options.fetchImpl || fetch;
-  let response: Response;
-  try {
-    response = await fetchImpl(options.credentials.baseUrl, {
+  const response = await boundedFetch(options.credentials.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
-    });
-  } catch {
-    throw new ServiceUnavailableException('SMS provider is unavailable');
-  }
+    }, fetchImpl);
 
-  const body = (await response.text().catch(() => '')).trim();
+  const body = (await response.text()).trim();
   const [code, , messageId] = body.split('|');
   if (!response.ok || code !== '1701') {
     throw new ServiceUnavailableException(digimilesError(code || String(response.status)));

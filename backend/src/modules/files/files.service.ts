@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -15,10 +16,11 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, rm, stat } from 'fs/promises';
+import { mkdir, rm, stat, writeFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
+import { assertDocumentContent } from './document-content';
 
 export const ALLOWED_KYC_MIME_TYPES = [
   'application/pdf',
@@ -109,7 +111,7 @@ export class FilesService {
       return {
         objectKey: key,
         uploadUrl: `${this.apiBaseUrl()}/files/dev-upload?token=${encodeURIComponent(
-          this.localToken(key, input.mimeType, 'upload'),
+          this.localToken(key, input.mimeType, 'upload', input.fileSizeBytes),
         )}`,
         expiresInSeconds: SIGNED_URL_TTL_SECONDS,
         maxBytes: MAX_KYC_FILE_BYTES,
@@ -118,7 +120,7 @@ export class FilesService {
     }
     this.assertReady();
     const key = this.buildObjectKey(input.userId, input.applicationId, input.mimeType);
-    const uploadUrl = await this.signPut(key, input.mimeType);
+    const uploadUrl = await this.signPut(key, input.mimeType, input.fileSizeBytes);
     return {
       objectKey: key,
       uploadUrl,
@@ -166,6 +168,7 @@ export class FilesService {
     try {
       const head = await (this.client as S3Client).send(
         new HeadObjectCommand({ Bucket: this.bucket(), Key: key }),
+        { abortSignal: AbortSignal.timeout(15_000) },
       );
       return { sizeBytes: Number(head.ContentLength ?? 0), contentType: head.ContentType ?? null };
     } catch (error) {
@@ -193,14 +196,74 @@ export class FilesService {
         Bucket: this.bucket(),
         Key: key,
       }),
+      { abortSignal: AbortSignal.timeout(15_000) },
     );
   }
 
-  private async signPut(key: string, mimeType: string) {
+  finalKey(key: string) {
+    if (!this.keyBelongsToUser(key, key.split('/')[1] || '')) {
+      throw new BadRequestException('Invalid upload reference');
+    }
+    return key.replace(/^kyc\//, 'kyc-final/');
+  }
+
+  async finalizeUpload(key: string, mimeType: string, expectedSize: number, expectedHash?: string) {
+    this.assertAllowedUpload(mimeType, expectedSize);
+    const objectKey = this.finalKey(key);
+    let source: AsyncIterable<Uint8Array>;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    try {
+      if (this.useLocalStorage()) {
+        source = createReadStream(this.localPath(key), { signal: controller.signal });
+      } else {
+        this.assertReady();
+        const object = await this.client!.send(new GetObjectCommand({ Bucket: this.bucket(), Key: key }), { abortSignal: controller.signal });
+        if (!object.Body) throw new BadRequestException('Upload not found');
+        source = object.Body as AsyncIterable<Uint8Array>;
+      }
+      const chunks: Buffer[] = [];
+      let sizeBytes = 0;
+      for await (const chunk of source) {
+        sizeBytes += chunk.byteLength;
+        if (sizeBytes > MAX_KYC_FILE_BYTES || sizeBytes > expectedSize) {
+          controller.abort();
+          throw new BadRequestException('Uploaded file size does not match');
+        }
+        chunks.push(Buffer.from(chunk));
+      }
+      if (sizeBytes !== expectedSize) throw new BadRequestException('Uploaded file size does not match');
+      const bytes = Buffer.concat(chunks);
+      assertDocumentContent(bytes, mimeType);
+      const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+      if (expectedHash && expectedHash.toLowerCase() !== sha256) throw new BadRequestException('Uploaded file checksum does not match');
+      if (this.useLocalStorage()) {
+        const path = this.localPath(objectKey);
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, bytes, { flag: 'wx' });
+      } else {
+        await this.client!.send(new PutObjectCommand({
+          Bucket: this.bucket(), Key: objectKey, Body: bytes, ContentType: mimeType,
+          ContentLength: sizeBytes, IfNoneMatch: '*', Metadata: { sha256 },
+        }), { abortSignal: controller.signal });
+      }
+      return { objectKey, sizeBytes, sha256 };
+    } catch (error) {
+      const failure = error as { code?: string; $metadata?: { httpStatusCode?: number } };
+      if (failure.code === 'EEXIST' || failure.$metadata?.httpStatusCode === 412) throw new ConflictException('This upload has already been confirmed');
+      if (failure.code === 'ENOENT' || failure.$metadata?.httpStatusCode === 404) throw new BadRequestException('Upload not found');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async signPut(key: string, mimeType: string, fileSizeBytes: number) {
     const command = new PutObjectCommand({
       Bucket: this.bucket(),
       Key: key,
       ContentType: mimeType,
+      ContentLength: fileSizeBytes,
     });
     return getSignedUrl(this.client as S3Client, command, { expiresIn: SIGNED_URL_TTL_SECONDS });
   }
@@ -236,17 +299,20 @@ export class FilesService {
         );
       },
     });
+    let created = false;
+    const output = createWriteStream(path, { flags: 'wx' });
+    output.once('open', () => { created = true; });
     try {
-      await pipeline(input, limit, createWriteStream(path, { flags: 'wx' }));
+      await pipeline(input, limit, output);
     } catch (error) {
-      await rm(path, { force: true });
+      if (created) await rm(path, { force: true });
       throw new BadRequestException(
         error instanceof Error ? error.message : 'Could not store document',
       );
     }
-    if (bytes < 1) {
+    if (bytes < 1 || (payload.sizeBytes !== undefined && bytes !== payload.sizeBytes)) {
       await rm(path, { force: true });
-      throw new BadRequestException('Document is empty');
+      throw new BadRequestException('Uploaded file size does not match');
     }
     return { uploaded: true };
   }
@@ -271,12 +337,13 @@ export class FilesService {
     return `http://localhost:${port}/${prefix}`;
   }
 
-  private localToken(key: string, contentType: string, operation: 'upload' | 'download') {
+  private localToken(key: string, contentType: string, operation: 'upload' | 'download', sizeBytes?: number) {
     const encoded = Buffer.from(
       JSON.stringify({
         key,
         contentType,
         operation,
+        sizeBytes,
         expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1_000,
       }),
     ).toString('base64url');
@@ -288,6 +355,7 @@ export class FilesService {
   }
 
   private verifyLocalToken(token: string, operation: 'upload' | 'download') {
+    if (typeof token !== 'string') throw new BadRequestException('Invalid upload token');
     const [encoded, signature] = token.split('.');
     if (!encoded || !signature) throw new BadRequestException('Invalid upload token');
     const expected = crypto
@@ -306,12 +374,13 @@ export class FilesService {
       key: string;
       contentType: string;
       operation: string;
+      sizeBytes?: number;
       expiresAt: number;
     };
     if (
       payload.operation !== operation ||
       payload.expiresAt <= Date.now() ||
-      !this.keyBelongsToUser(payload.key, payload.key.split('/')[1] || '')
+      !this.keyBelongsToUser(operation === 'download' ? payload.key.replace(/^kyc-final\//, 'kyc/') : payload.key, payload.key.split('/')[1] || '')
     ) {
       throw new BadRequestException('Invalid or expired upload token');
     }

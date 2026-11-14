@@ -1,3 +1,4 @@
+import { CreateRoleDto } from '../../common/dto/admin-mutations.dto';
 import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RolesService } from './roles.service';
@@ -30,7 +31,7 @@ export class RolesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new role' })
-  async create(@Body() data: { name: string; description?: string; permissionIds?: string[] }) {
+  async create(@Body() data: CreateRoleDto) {
     return this.rolesService.create(data);
   }
 

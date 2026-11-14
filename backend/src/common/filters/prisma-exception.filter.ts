@@ -13,7 +13,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest();
 
     let status = HttpStatus.BAD_REQUEST;
-    let message: string = exception.message;
+    let message = 'Internal server error';
 
     switch (exception.code) {
       case 'P2002': {
@@ -45,7 +45,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       error: 'Database Error',
       message,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: request.url.split('?')[0],
     });
   }
 }
